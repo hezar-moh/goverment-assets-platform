@@ -1,0 +1,113 @@
+{% extends 'shared/base.html' %}
+{% block title %}{{ page_title }} — GovAsset{% endblock %}
+{% block page_heading %}Master Data{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a href="{% url 'master_data_list' %}" class="btn btn-outline btn-sm btn-icon">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <h4>{{ page_title }}</h4>
+      <p>Add a new reference data entry</p>
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:start;">
+
+  <div class="card" style="padding:28px;">
+    <form method="post">
+      {% csrf_token %}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+        <div class="form-group" style="grid-column:1/-1;margin-bottom:0;">
+          <label class="form-label">Category <span class="req">*</span></label>
+          <select name="category" class="form-select" required>
+            <option value="">— Select category —</option>
+            {% for value, label in categories %}
+            <option value="{{ value }}"
+              {% if form_data.category == value %}selected{% endif %}>
+              {{ label }}
+            </option>
+            {% endfor %}
+          </select>
+          <div class="form-hint">
+            Which group this entry belongs to
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">
+            Value Code <span class="req">*</span>
+          </label>
+          <input type="text" name="value" class="form-control"
+                 placeholder="e.g. GOVT_BUDGET"
+                 value="{{ form_data.value|default:'' }}"
+                 oninput="this.value = this.value.toUpperCase().replace(/ /g,'_')"
+                 required>
+          <div class="form-hint">
+            Uppercase, no spaces. Used internally.
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">
+            Display Label <span class="req">*</span>
+          </label>
+          <input type="text" name="label" class="form-control"
+                 placeholder="e.g. Government Budget"
+                 value="{{ form_data.label|default:'' }}"
+                 required>
+          <div class="form-hint">
+            Shown to users in dropdowns
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Sort Order</label>
+          <input type="number" name="sort_order" class="form-control"
+                 min="0" max="999"
+                 value="{{ form_data.sort_order|default:'0' }}">
+          <div class="form-hint">
+            Lower numbers appear first. Default is 0.
+          </div>
+        </div>
+
+        <div style="grid-column:1/-1;margin-top:8px;display:flex;gap:8px;">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-plus-circle-fill"></i> Add Entry
+          </button>
+          <a href="{% url 'master_data_list' %}" class="btn btn-outline">
+            Cancel
+          </a>
+        </div>
+
+      </div>
+    </form>
+  </div>
+
+  <!-- Info panel -->
+  <div class="card" style="padding:20px;">
+    <div class="section-title">
+      <i class="bi bi-info-circle"></i> How it works
+    </div>
+    <div style="font-size:13px;color:var(--text-secondary);
+                line-height:1.7;display:flex;flex-direction:column;gap:8px;">
+      <p>
+        Master data controls what appears in dropdown menus across the system.
+      </p>
+      <p>
+        For example, adding a Funding Source entry here makes it available
+        when registering a new asset.
+      </p>
+      <p>
+        The <strong>Value Code</strong> is stored in the database.
+        The <strong>Display Label</strong> is what users see.
+      </p>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

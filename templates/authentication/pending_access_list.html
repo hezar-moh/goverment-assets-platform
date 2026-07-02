@@ -1,0 +1,179 @@
+{% extends 'shared/base.html' %}
+{% block title %}Pending Access — GovAsset{% endblock %}
+{% block page_heading %}Pending Access{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h4>Pending Access Requests</h4>
+    <p>Users who attempted login but were blocked by the system</p>
+  </div>
+  {% if request.user.role == 'SUPER_ADMIN' %}
+  <form method="post" action="{% url 'pending_access_clear' %}"
+        onsubmit="return confirm('Clear all rejected requests older than 30 days?')">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-outline">
+      <i class="bi bi-trash"></i> Clear Old Rejected
+    </button>
+  </form>
+  {% endif %}
+</div>
+
+<!-- Summary cards -->
+<div class="stat-grid" style="margin-bottom:20px;">
+  <div class="stat-card" style="cursor:pointer;"
+       onclick="window.location='?status=PENDING'">
+    <div class="stat-icon amber">
+      <i class="bi bi-hourglass-split"></i>
+    </div>
+    <div>
+      <div class="stat-value"
+           style="{% if total_pending > 0 %}color:var(--warning);{% endif %}">
+        {{ total_pending }}
+      </div>
+      <div class="stat-label">Pending Review</div>
+    </div>
+  </div>
+  <div class="stat-card" style="cursor:pointer;"
+       onclick="window.location='?status=APPROVED'">
+    <div class="stat-icon green">
+      <i class="bi bi-check-circle-fill"></i>
+    </div>
+    <div>
+      <div class="stat-value">{{ total_approved }}</div>
+      <div class="stat-label">Approved</div>
+    </div>
+  </div>
+  <div class="stat-card" style="cursor:pointer;"
+       onclick="window.location='?status=REJECTED'">
+    <div class="stat-icon red">
+      <i class="bi bi-x-circle-fill"></i>
+    </div>
+    <div>
+      <div class="stat-value">{{ total_rejected }}</div>
+      <div class="stat-label">Rejected</div>
+    </div>
+  </div>
+</div>
+
+<!-- Filter -->
+<div class="filter-bar" style="margin-bottom:16px;">
+  <form method="get" style="display:flex;gap:12px;
+                             align-items:flex-end;width:100%;">
+    <div class="filter-group">
+      <label>Status</label>
+      <select name="status" class="form-select">
+        <option value="">All Requests</option>
+        <option value="PENDING"
+          {% if status_filter == 'PENDING' %}selected{% endif %}>
+          Pending
+        </option>
+        <option value="APPROVED"
+          {% if status_filter == 'APPROVED' %}selected{% endif %}>
+          Approved
+        </option>
+        <option value="REJECTED"
+          {% if status_filter == 'REJECTED' %}selected{% endif %}>
+          Rejected
+        </option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm">
+      <i class="bi bi-funnel-fill"></i> Filter
+    </button>
+    <a href="{% url 'pending_access_list' %}"
+       class="btn btn-outline btn-sm">Clear</a>
+  </form>
+</div>
+
+<div class="card">
+  <div style="overflow-x:auto;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Full Name</th>
+          <th>IP Address</th>
+          <th>Attempted At</th>
+          <th>Status</th>
+          <th>Reviewed By</th>
+          <th style="text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in requests %}
+        <tr>
+          <td>
+            <div class="user-cell">
+              <div class="avatar avatar-red"
+                   style="width:30px;height:30px;font-size:11px;">
+                {{ item.username|slice:":2"|upper }}
+              </div>
+              <div>
+                <div style="font-weight:600;font-size:13px;">
+                  {{ item.username }}
+                </div>
+                <div style="font-size:11.5px;color:var(--text-muted);">
+                  {{ item.email|default:"No email" }}
+                </div>
+              </div>
+            </div>
+          </td>
+          <td style="color:var(--text-secondary);">
+            {{ item.full_name|default:"—" }}
+          </td>
+          <td>
+            <code style="font-size:11.5px;">
+              {{ item.ip_address|default:"—" }}
+            </code>
+          </td>
+          <td style="font-size:12.5px;color:var(--text-muted);
+                     white-space:nowrap;">
+            {{ item.attempted_at|date:"d M Y H:i" }}
+          </td>
+          <td>
+            <span class="badge
+              {% if item.status == 'PENDING' %}badge-maint
+              {% elif item.status == 'APPROVED' %}badge-create
+              {% else %}badge-delete{% endif %}">
+              {{ item.status }}
+            </span>
+          </td>
+          <td style="font-size:12.5px;color:var(--text-muted);">
+            {{ item.reviewed_by_name|default:"—" }}
+            {% if item.reviewed_at %}
+            <br>
+            <span style="font-size:11px;">
+              {{ item.reviewed_at|date:"d M Y" }}
+            </span>
+            {% endif %}
+          </td>
+          <td style="text-align:right;">
+            {% if item.status == 'PENDING' %}
+            <a href="{% url 'pending_access_review' item.id %}"
+               class="btn btn-outline btn-sm">
+              <i class="bi bi-eye"></i> Review
+            </a>
+            {% else %}
+            <a href="{% url 'pending_access_review' item.id %}"
+               class="btn btn-outline btn-sm btn-icon">
+              <i class="bi bi-eye"></i>
+            </a>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7">
+            <div class="empty-state">
+              <i class="bi bi-shield-check"></i>
+              <p>No access requests found.</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

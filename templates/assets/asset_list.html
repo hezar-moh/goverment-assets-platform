@@ -1,0 +1,161 @@
+{% extends 'shared/base.html' %}
+{% block title %}Asset Register — GovAsset{% endblock %}
+{% block page_heading %}Asset Register{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h4>Asset Register</h4>
+    <p>
+      Government assets under
+      <code>{{ request.user.ministry_schema|default:"platform" }}</code>
+      {% if paginator %}
+      — <strong>{{ paginator.count }}</strong>
+      total asset{{ paginator.count|pluralize }}
+      {% endif %}
+    </p>
+  </div>
+  {% if can_edit %}
+  <a href="{% url 'asset_create' %}" class="btn btn-primary">
+    <i class="bi bi-plus-circle-fill"></i> Register Asset
+  </a>
+  {% endif %}
+</div>
+
+{% if is_super_admin %}
+<div class="card" style="padding:40px;text-align:center;">
+  <i class="bi bi-info-circle" style="font-size:2rem;color:var(--info);display:block;margin-bottom:10px;"></i>
+  <p style="color:var(--text-secondary);">Super Admin manages ministries and users at platform level. Log in as a ministry user to manage assets.</p>
+</div>
+{% else %}
+
+<div class="filter-bar">
+  <form method="get" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;width:100%;">
+    <div class="filter-group" style="flex:2;min-width:200px;">
+      <label>Search</label>
+      <div class="input-group">
+        <span class="input-group-icon"><i class="bi bi-search"></i></span>
+        <input type="text" name="search" class="form-control"
+               placeholder="Asset number or name..." value="{{ search }}">
+      </div>
+    </div>
+    <div class="filter-group">
+      <label>Status</label>
+      <select name="status" class="form-select">
+        <option value="">All Statuses</option>
+        {% for value, label in STATUS_CHOICES %}
+        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Category</label>
+      <select name="category" class="form-select">
+        <option value="">All Categories</option>
+        {% for cat in categories %}
+        <option value="{{ cat.id }}" {% if category_filter == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button type="submit" class="btn btn-primary btn-sm">
+        <i class="bi bi-funnel-fill"></i> Filter
+      </button>
+      <a href="{% url 'asset_list' %}" class="btn btn-outline btn-sm">
+        <i class="bi bi-x"></i>
+      </a>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div style="overflow-x:auto;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Asset No.</th>
+          <th>Name</th>
+          <th>Category</th>
+          <th>Status</th>
+          <th>Condition</th>
+          <th>Location</th>
+          <th style="text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for asset in assets %}
+        <tr>
+          <td><code>{{ asset.asset_number }}</code></td>
+          <td style="font-weight:600;">{{ asset.name }}</td>
+          <td>
+            <span class="badge" style="background:var(--bg-page);color:var(--text-secondary);border-color:var(--border);">
+              {{ asset.category.name }}
+            </span>
+          </td>
+          <td>
+            <span class="badge
+              {% if asset.status == 'ACTIVE' %}badge-active
+              {% elif asset.status == 'UNDER_MAINTENANCE' %}badge-maint
+              {% elif asset.status == 'DECOMMISSIONED' %}badge-decomm
+              {% elif asset.status == 'DISPOSED' %}badge-disposed
+              {% else %}badge-planned{% endif %}">
+              {{ asset.get_status_display }}
+            </span>
+          </td>
+          <td>
+            <span class="badge
+              {% if asset.condition == 'EXCELLENT' or asset.condition == 'GOOD' %}badge-active
+              {% elif asset.condition == 'FAIR' %}badge-maint
+              {% else %}badge-delete{% endif %}">
+              {{ asset.get_condition_display }}
+            </span>
+          </td>
+          <td style="color:var(--text-muted);font-size:13px;">
+            {{ asset.location_description|default:"—" }}
+          </td>
+          <td style="text-align:right;">
+            <div style="display:flex;gap:4px;justify-content:flex-end;">
+              <a href="{% url 'asset_detail' asset.id %}" class="btn btn-outline btn-sm btn-icon" title="View">
+                <i class="bi bi-eye"></i>
+              </a>
+              {% if can_edit %}
+              <a href="{% url 'asset_edit' asset.id %}" class="btn btn-outline btn-sm btn-icon" title="Edit">
+                <i class="bi bi-pencil"></i>
+              </a>
+              {% endif %}
+              {% if request.user.role == 'MINISTRY_ADMIN' %}
+              <form method="post" action="{% url 'asset_delete' asset.id %}" class="d-inline"
+                    onsubmit="return confirm('Delete {{ asset.asset_number }}? This action cannot be undone.')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger-outline btn-sm btn-icon" title="Delete">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7">
+            <div class="empty-state">
+              <i class="bi bi-inbox"></i>
+              <p>No assets found. {% if can_edit %}Register your first asset to get started.{% endif %}</p>
+              {% if can_edit %}
+              <a href="{% url 'asset_create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle-fill"></i> Register Asset
+              </a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+      </div>
+      {% if page %}
+      {% include 'shared/pagination.html' %}
+      {% endif %}
+    </div>
+{% endblock %}

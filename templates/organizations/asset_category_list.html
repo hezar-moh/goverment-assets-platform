@@ -1,0 +1,105 @@
+{% extends 'shared/base.html' %}
+{% block title %}Asset Categories — GovAsset{% endblock %}
+{% block page_heading %}Asset Categories{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h4>Asset Categories</h4>
+    <p>
+      {{ total }} categor{{ total|pluralize:"y,ies" }} —
+      these appear in the asset registration form
+    </p>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <a href="{% url 'master_data_list' %}" class="btn btn-outline">
+      <i class="bi bi-arrow-left"></i> Back to Master Data
+    </a>
+    <a href="{% url 'asset_category_create' %}" class="btn btn-primary">
+      <i class="bi bi-plus-circle-fill"></i> Add Category
+    </a>
+  </div>
+</div>
+
+<div class="card">
+  <div style="overflow-x:auto;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Name</th>
+          <th>Description</th>
+          <th>Used in Asset Numbers</th>
+          <th>Status</th>
+          <th style="text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cat in categories %}
+        <tr style="{% if not cat.is_active %}opacity:0.55;{% endif %}">
+          <td>
+            <code style="font-size:13px;font-weight:700;">
+              {{ cat.code }}
+            </code>
+          </td>
+          <td style="font-weight:600;">{{ cat.name }}</td>
+          <td style="color:var(--text-muted);font-size:13px;">
+            {{ cat.description|default:"—"|truncatechars:60 }}
+          </td>
+          <td>
+            <span style="font-family:var(--font-mono);font-size:12px;
+                         color:var(--accent);">
+              MOH-{{ cat.code }}-2024-XXXX
+            </span>
+          </td>
+          <td>
+            <span class="status-dot
+              {% if cat.is_active %}active{% else %}inactive{% endif %}">
+            </span>
+            {% if cat.is_active %}Active{% else %}Inactive{% endif %}
+          </td>
+          <td>
+            <div style="display:flex;gap:4px;justify-content:flex-end;">
+              <a href="{% url 'asset_category_edit' cat.id %}"
+                 class="btn btn-outline btn-sm btn-icon" title="Edit">
+                <i class="bi bi-pencil"></i>
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6">
+            <div class="empty-state">
+              <i class="bi bi-tags"></i>
+              <p>No asset categories found.</p>
+              <a href="{% url 'asset_category_create' %}"
+                 class="btn btn-primary">
+                <i class="bi bi-plus-circle-fill"></i> Add First Category
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Info box -->
+<div style="margin-top:16px;padding:14px 16px;
+            background:var(--info-bg);
+            border:1px solid var(--info-border);
+            border-radius:var(--radius-md);
+            display:flex;align-items:flex-start;gap:10px;">
+  <i class="bi bi-info-circle-fill"
+     style="color:var(--info);margin-top:1px;flex-shrink:0;"></i>
+  <div style="font-size:13px;color:var(--info);line-height:1.6;">
+    <strong>Note:</strong> Category codes are used in auto-generated
+    asset numbers and <strong>cannot be changed</strong> after creation
+    because existing assets already carry that code in their number.
+    To retire a category, mark it as Inactive — existing assets are
+    not affected.
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,143 @@
+{% extends 'shared/base.html' %}
+{% block title %}{{ page_title }} — GovAsset{% endblock %}
+{% block page_heading %}Edit User{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a href="{% url 'user_list' %}" class="btn btn-outline btn-sm btn-icon">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <h4>{{ page_title }}</h4>
+      <p>Modify user details and role assignment</p>
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:start;">
+
+  <div class="card" style="padding:28px;">
+
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px;
+                padding-bottom:20px;border-bottom:1px solid var(--border);">
+      <div class="avatar avatar-blue" style="width:52px;height:52px;font-size:18px;">
+        {{ target_user.first_name|slice:":1"|upper }}{{ target_user.last_name|slice:":1"|upper }}
+      </div>
+      <div>
+        <div style="font-size:16px;font-weight:700;">{{ target_user.get_full_name }}</div>
+        <div style="color:var(--text-muted);font-size:13px;">@{{ target_user.username }}</div>
+      </div>
+    </div>
+
+    <form method="post">
+      {% csrf_token %}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">First Name <span class="req">*</span></label>
+          <input type="text" name="first_name" class="form-control"
+                 value="{{ target_user.first_name }}" required>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Last Name <span class="req">*</span></label>
+          <input type="text" name="last_name" class="form-control"
+                 value="{{ target_user.last_name }}" required>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control"
+                 value="{{ target_user.email|default:'' }}">
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Phone</label>
+          <input type="text" name="phone" class="form-control"
+                 placeholder="+255 7XX XXX XXX"
+                 value="{{ target_user.phone|default:'' }}">
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Role <span class="req">*</span></label>
+          <select name="role" class="form-select" required>
+            {% for role in allowed_roles %}
+            <option value="{{ role }}"
+              {% if target_user.role == role %}selected{% endif %}>
+              {{ role }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        {% if editor_role == 'SUPER_ADMIN' %}
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Ministry Schema</label>
+          <select name="ministry_schema" class="form-select">
+            <option value="">— None (Super Admin) —</option>
+            {% for ministry in ministries %}
+            <option value="{{ ministry.schema_name }}"
+              {% if target_user.ministry_schema == ministry.schema_name %}selected{% endif %}>
+              {{ ministry.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+
+        <div class="col-span-2" style="grid-column:1/-1;margin-top:8px;display:flex;gap:8px;">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-circle-fill"></i> Save Changes
+          </button>
+          <a href="{% url 'user_list' %}" class="btn btn-outline">Cancel</a>
+        </div>
+
+      </div>
+    </form>
+
+  </div>
+
+  <!-- Info panel -->
+  <div style="display:flex;flex-direction:column;gap:14px;">
+
+    <div class="card" style="padding:20px;">
+      <div class="section-title"><i class="bi bi-info-circle"></i> Account Info</div>
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;">
+        <div>
+          <div style="color:var(--text-muted);font-size:11px;font-weight:700;text-transform:uppercase;">Username</div>
+          <code>{{ target_user.username }}</code>
+        </div>
+        <div>
+          <div style="color:var(--text-muted);font-size:11px;font-weight:700;text-transform:uppercase;">Current Role</div>
+          <span class="badge
+            {% if target_user.role == 'SUPER_ADMIN' %}badge-role-super
+            {% elif target_user.role == 'MINISTRY_ADMIN' %}badge-role-mAdmin
+            {% elif target_user.role == 'AGENCY_MANAGER' %}badge-role-agency
+            {% elif target_user.role == 'FACILITY_CLERK' %}badge-role-clerk
+            {% else %}badge-role-auditor{% endif %}">
+            {{ target_user.role }}
+          </span>
+        </div>
+        <div>
+          <div style="color:var(--text-muted);font-size:11px;font-weight:700;text-transform:uppercase;">Status</div>
+          <span class="status-dot {% if target_user.is_active %}active{% else %}inactive{% endif %}"></span>
+          {% if target_user.is_active %}Active{% else %}Inactive{% endif %}
+        </div>
+        <div>
+          <div style="color:var(--text-muted);font-size:11px;font-weight:700;text-transform:uppercase;">Joined</div>
+          {{ target_user.date_joined|date:"d M Y" }}
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:12px 14px;background:var(--warning-bg);border:1px solid var(--warning-border);
+                border-radius:var(--radius-md);font-size:12.5px;color:var(--warning);">
+      <i class="bi bi-exclamation-triangle-fill" style="margin-right:6px;"></i>
+      Changing a user's role takes effect immediately on their next request.
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

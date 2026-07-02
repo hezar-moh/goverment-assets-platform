@@ -1,0 +1,104 @@
+{% extends 'shared/base.html' %}
+{% block title %}Ministries — GovAsset{% endblock %}
+{% block page_heading %}Ministry Management{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h4>Ministry Management</h4>
+    <p>{{ total }} ministr{{ total|pluralize:"y,ies" }} registered on the platform</p>
+  </div>
+  <a href="{% url 'ministry_create' %}" class="btn btn-primary">
+    <i class="bi bi-plus-circle-fill"></i> Onboard Ministry
+  </a>
+</div>
+
+<div class="card">
+  <div style="overflow-x:auto;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Ministry</th>
+          <th>Schema</th>
+          <th>Domain</th>
+          <th>Assets</th>
+          <th>Users</th>
+          <th>Status</th>
+          <th style="text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in ministry_data %}
+        <tr style="{% if not item.ministry.is_active %}opacity:0.55;{% endif %}">
+          <td>
+            <div class="user-cell">
+              <div class="avatar avatar-blue"
+                   style="width:36px;height:36px;font-size:12px;border-radius:8px;">
+                {{ item.ministry.short_name|slice:":2"|upper }}
+              </div>
+              <div>
+                <div class="user-cell-name">{{ item.ministry.name }}</div>
+                <div class="user-cell-sub">{{ item.ministry.short_name }}</div>
+              </div>
+            </div>
+          </td>
+          <td><code>{{ item.ministry.schema_name }}</code></td>
+          <td>
+            <span style="font-size:13px;color:var(--text-secondary);">
+              {{ item.primary_domain.domain|default:"—" }}
+            </span>
+          </td>
+          <td>
+            <span style="font-weight:700;color:var(--accent);">
+              {{ item.asset_count }}
+            </span>
+          </td>
+          <td>
+            <span style="font-weight:600;">{{ item.user_count }}</span>
+          </td>
+          <td>
+            <span class="status-dot
+              {% if item.ministry.is_active %}active{% else %}inactive{% endif %}">
+            </span>
+            {% if item.ministry.is_active %}Active{% else %}Inactive{% endif %}
+          </td>
+          <td>
+            <div style="display:flex;gap:4px;justify-content:flex-end;">
+              <a href="{% url 'ministry_detail' item.ministry.id %}"
+                 class="btn btn-outline btn-sm btn-icon" title="View details">
+                <i class="bi bi-eye"></i>
+              </a>
+              <form method="post"
+                    action="{% url 'ministry_toggle_active' item.ministry.id %}"
+                    style="display:inline;"
+                    onsubmit="return confirm('{% if item.ministry.is_active %}Deactivate{% else %}Activate{% endif %} {{ item.ministry.name }}?')">
+                {% csrf_token %}
+                <button type="submit"
+                        class="btn btn-sm btn-icon
+                          {% if item.ministry.is_active %}btn-danger-outline
+                          {% else %}btn-outline{% endif %}"
+                        title="{% if item.ministry.is_active %}Deactivate{% else %}Activate{% endif %}">
+                  <i class="bi bi-{% if item.ministry.is_active %}pause-circle{% else %}play-circle{% endif %}"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7">
+            <div class="empty-state">
+              <i class="bi bi-building"></i>
+              <p>No ministries onboarded yet.</p>
+              <a href="{% url 'ministry_create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle-fill"></i> Onboard First Ministry
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

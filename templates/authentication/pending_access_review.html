@@ -1,0 +1,249 @@
+{% extends 'shared/base.html' %}
+{% block title %}Review Access Request — GovAsset{% endblock %}
+{% block page_heading %}Review Access Request{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a href="{% url 'pending_access_list' %}"
+       class="btn btn-outline btn-sm btn-icon">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <h4>Review: {{ pending.username }}</h4>
+      <p>Blocked login attempt — review and decide action</p>
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 300px;
+            gap:20px;align-items:start;">
+
+  <!-- Main card -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+
+    <div class="card" style="padding:24px;">
+      <div class="section-title">
+        <i class="bi bi-person-fill"></i> Requester Details
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <div style="font-size:11px;font-weight:700;
+                      text-transform:uppercase;
+                      letter-spacing:0.5px;
+                      color:var(--text-muted);margin-bottom:4px;">
+            Username
+          </div>
+          <code style="font-size:14px;">{{ pending.username }}</code>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;
+                      text-transform:uppercase;
+                      letter-spacing:0.5px;
+                      color:var(--text-muted);margin-bottom:4px;">
+            Full Name
+          </div>
+          <span style="font-weight:600;">
+            {{ pending.full_name|default:"Not provided" }}
+          </span>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;
+                      text-transform:uppercase;
+                      letter-spacing:0.5px;
+                      color:var(--text-muted);margin-bottom:4px;">
+            Email
+          </div>
+          <span>{{ pending.email|default:"Not provided" }}</span>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;
+                      text-transform:uppercase;
+                      letter-spacing:0.5px;
+                      color:var(--text-muted);margin-bottom:4px;">
+            IP Address
+          </div>
+          <code>{{ pending.ip_address|default:"—" }}</code>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;
+                      text-transform:uppercase;
+                      letter-spacing:0.5px;
+                      color:var(--text-muted);margin-bottom:4px;">
+            Attempted At
+          </div>
+          <span>{{ pending.attempted_at|date:"d M Y H:i:s" }}</span>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;
+                      text-transform:uppercase;
+                      letter-spacing:0.5px;
+                      color:var(--text-muted);margin-bottom:4px;">
+            Current Status
+          </div>
+          <span class="badge
+            {% if pending.status == 'PENDING' %}badge-maint
+            {% elif pending.status == 'APPROVED' %}badge-create
+            {% else %}badge-delete{% endif %}">
+            {{ pending.status }}
+          </span>
+        </div>
+        {% if pending.keycloak_id %}
+        <div style="grid-column:1/-1;">
+          <div style="font-size:11px;font-weight:700;
+                      text-transform:uppercase;
+                      letter-spacing:0.5px;
+                      color:var(--text-muted);margin-bottom:4px;">
+            Keycloak ID
+          </div>
+          <code>{{ pending.keycloak_id }}</code>
+        </div>
+        {% endif %}
+        {% if pending.user_agent %}
+        <div style="grid-column:1/-1;">
+          <div style="font-size:11px;font-weight:700;
+                      text-transform:uppercase;
+                      letter-spacing:0.5px;
+                      color:var(--text-muted);margin-bottom:4px;">
+            Browser / Device
+          </div>
+          <span style="font-size:12px;color:var(--text-muted);">
+            {{ pending.user_agent|truncatechars:120 }}
+          </span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if pending.status == 'PENDING' %}
+    <div class="card" style="padding:24px;">
+      <div class="section-title">
+        <i class="bi bi-pencil-fill"></i> Review Decision
+      </div>
+      <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+          <label class="form-label">Review Notes</label>
+          <textarea name="review_notes" class="form-control"
+                    rows="3"
+                    placeholder="Add notes about this decision — why approved or rejected..."></textarea>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px;">
+          <button type="submit" name="action" value="APPROVE"
+                  class="btn btn-primary">
+            <i class="bi bi-check-circle-fill"></i> Approve Request
+          </button>
+          <button type="submit" name="action" value="REJECT"
+                  class="btn btn-danger-outline"
+                  onclick="return confirm('Reject this access request?')">
+            <i class="bi bi-x-circle-fill"></i> Reject Request
+          </button>
+        </div>
+      </form>
+    </div>
+    {% else %}
+    <div class="card" style="padding:24px;">
+      <div class="section-title">
+        <i class="bi bi-clipboard-check"></i> Review Result
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <div style="font-size:11px;font-weight:700;
+                      text-transform:uppercase;
+                      letter-spacing:0.5px;
+                      color:var(--text-muted);margin-bottom:4px;">
+            Decision
+          </div>
+          <span class="badge
+            {% if pending.status == 'APPROVED' %}badge-create
+            {% else %}badge-delete{% endif %}"
+            style="font-size:13px;padding:5px 12px;">
+            {{ pending.status }}
+          </span>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;
+                      text-transform:uppercase;
+                      letter-spacing:0.5px;
+                      color:var(--text-muted);margin-bottom:4px;">
+            Reviewed By
+          </div>
+          <span style="font-weight:600;">
+            {{ pending.reviewed_by_name|default:"—" }}
+          </span>
+          <div style="font-size:12px;color:var(--text-muted);">
+            {{ pending.reviewed_at|date:"d M Y H:i" }}
+          </div>
+        </div>
+        {% if pending.review_notes %}
+        <div style="grid-column:1/-1;">
+          <div style="font-size:11px;font-weight:700;
+                      text-transform:uppercase;
+                      letter-spacing:0.5px;
+                      color:var(--text-muted);margin-bottom:4px;">
+            Notes
+          </div>
+          <p style="margin:0;color:var(--text-secondary);">
+            {{ pending.review_notes }}
+          </p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Side panel -->
+  <div style="display:flex;flex-direction:column;gap:14px;">
+
+    <div class="card" style="padding:20px;">
+      <div class="section-title">
+        <i class="bi bi-info-circle"></i> What to do next
+      </div>
+      <div style="font-size:13px;color:var(--text-secondary);
+                  line-height:1.7;">
+        {% if pending.status == 'PENDING' %}
+        <p>
+          <strong>If you know this person</strong> and they should
+          have access: click Approve, then go to
+          <a href="{% url 'user_create' %}"
+             style="color:var(--accent);">User Management</a>
+          to create their account.
+        </p>
+        <p>
+          <strong>If you do not recognise</strong> this person or
+          they should not have access: click Reject.
+        </p>
+        {% elif pending.status == 'APPROVED' %}
+        <p>
+          This request was approved. If the user account has not
+          been created yet, go to
+          <a href="{% url 'user_create' %}"
+             style="color:var(--accent);">User Management</a>
+          to create it now.
+        </p>
+        {% else %}
+        <p>
+          This request was rejected. No further action needed.
+        </p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div style="padding:12px 14px;
+                background:var(--warning-bg);
+                border:1px solid var(--warning-border);
+                border-radius:var(--radius-md);
+                font-size:12.5px;color:var(--warning);
+                line-height:1.6;">
+      <i class="bi bi-shield-exclamation"
+         style="margin-right:6px;"></i>
+      Approving does NOT automatically create an account.
+      Account creation must always be done manually by an
+      administrator as a deliberate security decision.
+    </div>
+
+  </div>
+</div>
+{% endblock %}

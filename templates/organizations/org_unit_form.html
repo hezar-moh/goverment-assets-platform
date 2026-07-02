@@ -1,0 +1,212 @@
+{% extends 'shared/base.html' %}
+{% block title %}{{ page_title }} — GovAsset{% endblock %}
+{% block page_heading %}Add Organisation Unit{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a href="{% url 'org_unit_list' %}" class="btn btn-outline btn-sm btn-icon">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <h4>{{ page_title }}</h4>
+      <p>Add an Agency or Facility to the organisation hierarchy</p>
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:start;">
+
+  <div class="card" style="padding:28px;">
+    <form method="post">
+      {% csrf_token %}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+        <div class="form-group" style="grid-column:1/-1;margin-bottom:0;">
+          <label class="form-label">Unit Name <span class="req">*</span></label>
+          <input type="text" name="name" class="form-control"
+                 placeholder="e.g. Muhimbili National Hospital"
+                 value="{{ form_data.name|default:'' }}" required autofocus>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Short Code</label>
+          <input type="text" name="code" class="form-control"
+                 placeholder="e.g. MNH" maxlength="20"
+                 value="{{ form_data.code|default:'' }}"
+                 oninput="this.value = this.value.toUpperCase()">
+          <div class="form-hint">Optional abbreviation for this unit</div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Unit Type <span class="req">*</span></label>
+          <select name="unit_type" class="form-select" required
+                  onchange="updateParentDropdown(this.value)">
+            <option value="">— Select type —</option>
+            <option value="AGENCY"
+              {% if form_data.unit_type == 'AGENCY' %}selected{% endif %}>
+              Agency (e.g. Hospital, School, Department)
+            </option>
+            <option value="FACILITY"
+              {% if form_data.unit_type == 'FACILITY' %}selected{% endif %}>
+              Facility (e.g. Ward, Room, Unit)
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group" style="grid-column:1/-1;margin-bottom:0;">
+          <label class="form-label" id="parent_label">
+            Parent Unit <span class="req">*</span>
+          </label>
+          <select name="parent_id" id="parent_select" class="form-select" required>
+            <option value="">— Select unit type first —</option>
+          </select>
+          <div class="form-hint" id="parent_hint">
+            First select a unit type above
+          </div>
+        </div>
+
+        <div style="grid-column:1/-1;margin-top:8px;display:flex;gap:8px;">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-plus-circle-fill"></i> Create Unit
+          </button>
+          <a href="{% url 'org_unit_list' %}" class="btn btn-outline">Cancel</a>
+        </div>
+
+      </div>
+    </form>
+  </div>
+
+  <!-- Info panel -->
+  <div style="display:flex;flex-direction:column;gap:14px;">
+
+    <div class="card" style="padding:20px;">
+      <div class="section-title">
+        <i class="bi bi-diagram-3"></i> Hierarchy Rules
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;
+                  font-size:13px;color:var(--text-secondary);line-height:1.6;">
+        <div style="display:flex;gap:8px;align-items:flex-start;">
+          <span class="badge badge-role-mAdmin" style="flex-shrink:0;font-size:10px;">
+            MINISTRY
+          </span>
+          Created automatically during onboarding. Cannot be added here.
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-start;">
+          <span class="badge badge-role-agency" style="flex-shrink:0;font-size:10px;">
+            AGENCY
+          </span>
+          Must be placed directly under a Ministry. Examples: hospitals, schools, offices.
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-start;">
+          <span class="badge badge-role-clerk" style="flex-shrink:0;font-size:10px;">
+            FACILITY
+          </span>
+          Must be placed under an Agency. Examples: wards, departments, labs.
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:12px 14px;background:var(--info-bg);
+                border:1px solid var(--info-border);
+                border-radius:var(--radius-md);font-size:12.5px;
+                color:var(--info);line-height:1.6;">
+      <i class="bi bi-info-circle-fill" style="margin-right:6px;"></i>
+      Assets are assigned to Facilities. Make sure you create the full
+      chain: Ministry → Agency → Facility before registering assets.
+    </div>
+
+  </div>
+</div>
+
+<!--
+  We store all parent units as a JavaScript array.
+  Django renders this data into the page as JSON.
+  JavaScript then uses this array to rebuild the dropdown
+  when the user selects a unit type.
+  This approach works in ALL browsers — no display:none tricks.
+-->
+<script>
+const ALL_UNITS = [
+  {% for unit in parent_units %}
+  {
+    id:   {{ unit.id }},
+    name: "{{ unit.name|escapejs }}",
+    code: "{{ unit.code|default:''|escapejs }}",
+    type: "{{ unit.unit_type }}"
+  }{% if not forloop.last %},{% endif %}
+  {% endfor %}
+];
+
+function updateParentDropdown(selectedType) {
+  const select   = document.getElementById('parent_select');
+  const label    = document.getElementById('parent_label');
+  const hint     = document.getElementById('parent_hint');
+
+  // Clear all existing options
+  select.innerHTML = '';
+
+  if (!selectedType) {
+    select.innerHTML = '<option value="">— Select unit type first —</option>';
+    label.innerHTML  = 'Parent Unit <span class="req">*</span>';
+    hint.textContent = 'First select a unit type above';
+    return;
+  }
+
+  // Determine which parent type we need
+  let requiredParentType = '';
+  if (selectedType === 'AGENCY') {
+    requiredParentType   = 'MINISTRY';
+    label.innerHTML      = 'Parent Ministry <span class="req">*</span>';
+    hint.textContent     = 'Select the Ministry this Agency belongs to';
+  } else if (selectedType === 'FACILITY') {
+    requiredParentType   = 'AGENCY';
+    label.innerHTML      = 'Parent Agency <span class="req">*</span>';
+    hint.textContent     = 'Select the Agency this Facility belongs to';
+  }
+
+  // Filter units to only the correct parent type
+  const filtered = ALL_UNITS.filter(u => u.type === requiredParentType);
+
+  if (filtered.length === 0) {
+    // No valid parents found — tell the user what they need to create first
+    select.innerHTML = `<option value="">— No ${requiredParentType.toLowerCase()} units found —</option>`;
+    hint.textContent = `You must create a ${requiredParentType.toLowerCase()} unit first.`;
+    hint.style.color = 'var(--danger)';
+    return;
+  }
+
+  // Add the blank placeholder option first
+  const placeholder = document.createElement('option');
+  placeholder.value       = '';
+  placeholder.textContent = `— Select ${requiredParentType.toLowerCase()} —`;
+  select.appendChild(placeholder);
+
+  // Add one option per matching unit
+  filtered.forEach(unit => {
+    const opt       = document.createElement('option');
+    opt.value       = unit.id;
+    opt.textContent = unit.code
+      ? `${unit.name} (${unit.code})`
+      : unit.name;
+    select.appendChild(opt);
+  });
+
+  hint.style.color = '';
+}
+
+// If form was submitted with errors and unit_type already has a value,
+// re-trigger the dropdown so the parent options are visible again
+document.addEventListener('DOMContentLoaded', function() {
+  const typeSelect = document.querySelector('[name=unit_type]');
+  if (typeSelect.value) {
+    updateParentDropdown(typeSelect.value);
+    // Restore previously selected parent if form was resubmitted
+    const savedParent = "{{ form_data.parent_id|default:'' }}";
+    if (savedParent) {
+      document.getElementById('parent_select').value = savedParent;
+    }
+  }
+});
+</script>
+{% endblock %}

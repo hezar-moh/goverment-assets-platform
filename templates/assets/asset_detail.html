@@ -1,0 +1,316 @@
+{% extends 'shared/base.html' %}
+{% block title %}{{ asset.asset_number }} — GovAsset{% endblock %}
+{% block page_heading %}Asset Detail{% endblock %}
+
+{% block content %}
+
+<!-- Page header -->
+<div class="page-header">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a href="{% url 'asset_list' %}" class="btn btn-outline btn-sm btn-icon">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <h4>{{ asset.name }}</h4>
+      <p>
+        <code>{{ asset.asset_number }}</code>
+        &nbsp;·&nbsp; {{ asset.category.name }}
+        {% if asset.is_expired %}
+        &nbsp;·&nbsp;
+        <span style="color:var(--danger);font-weight:600;font-size:12px;">
+          <i class="bi bi-exclamation-triangle-fill"></i> EXPIRED
+        </span>
+        {% elif asset.expires_soon %}
+        &nbsp;·&nbsp;
+        <span style="color:var(--warning);font-weight:600;font-size:12px;">
+          <i class="bi bi-clock-fill"></i> Expires in {{ asset.days_until_expiry }} days
+        </span>
+        {% endif %}
+      </p>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    {% if can_edit %}
+    <a href="{% url 'asset_edit' asset.id %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-pencil-fill"></i> Edit Asset
+    </a>
+    {% endif %}
+    {% if request.user.role == 'MINISTRY_ADMIN' %}
+    <form method="post" action="{% url 'asset_delete' asset.id %}"
+          onsubmit="return confirm('Permanently delete this asset? This cannot be undone.')">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger-outline btn-sm">
+        <i class="bi bi-trash"></i> Delete
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Expiry alert banner -->
+{% if asset.is_expired %}
+<div class="alert alert-danger" style="margin-bottom:20px;">
+  <i class="bi bi-exclamation-triangle-fill"></i>
+  This asset expired on <strong>{{ asset.asset_expiry_date|date:"d M Y" }}</strong>.
+  It should be reviewed for renewal or disposal.
+</div>
+{% elif asset.expires_soon %}
+<div class="alert alert-warning" style="margin-bottom:20px;">
+  <i class="bi bi-clock-fill"></i>
+  This asset expires on <strong>{{ asset.asset_expiry_date|date:"d M Y" }}</strong>
+  — <strong>{{ asset.days_until_expiry }} days remaining</strong>. Schedule renewal soon.
+</div>
+{% endif %}
+
+<div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start;">
+
+  <!-- Left column -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+
+    <!-- Identification -->
+    <div class="card" style="padding:24px;">
+      <div class="section-title"><i class="bi bi-tag-fill"></i> Identification</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Asset Number</div>
+          <code style="font-size:14px;">{{ asset.asset_number }}</code>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Category</div>
+          <span style="font-weight:600;">{{ asset.category.name }}</span>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Serial Number</div>
+          <span>{{ asset.serial_number|default:"—" }}</span>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Model Number</div>
+          <span>{{ asset.model_number|default:"—" }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Manufacturer and supplier -->
+    <div class="card" style="padding:24px;">
+      <div class="section-title"><i class="bi bi-building"></i> Manufacturer & Supplier</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Manufacturer</div>
+          <span style="font-weight:600;">{{ asset.manufacturer|default:"—" }}</span>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Supplier</div>
+          <span>{{ asset.supplier_name|default:"—" }}</span>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Purchase Order No.</div>
+          <code>{{ asset.purchase_order_number|default:"—" }}</code>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Useful Life</div>
+          <span>{% if asset.useful_life_years %}{{ asset.useful_life_years }} years{% else %}—{% endif %}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Location -->
+    <div class="card" style="padding:24px;">
+      <div class="section-title">
+        <i class="bi bi-geo-alt-fill"></i> Location
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;
+                      letter-spacing:0.5px;color:var(--text-muted);
+                      margin-bottom:4px;">Facility</div>
+          <span style="font-weight:600;">
+            {{ asset.org_unit_name|default:"Not assigned" }}
+          </span>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;
+                      letter-spacing:0.5px;color:var(--text-muted);
+                      margin-bottom:4px;">Location Type</div>
+          <span>{{ asset.location_type|default:"—" }}</span>
+        </div>
+        <div style="grid-column:1/-1;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;
+                      letter-spacing:0.5px;color:var(--text-muted);
+                      margin-bottom:4px;">Location Description</div>
+          <span>{{ asset.location_description|default:"—" }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Disposal info — only shown when asset is disposed -->
+    {% if asset.status == 'DISPOSED' %}
+    <div class="card" style="padding:24px;border-color:var(--danger-border);">
+      <div class="section-title" style="color:var(--danger);">
+        <i class="bi bi-trash-fill"></i> Disposal Information
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;
+                      letter-spacing:0.5px;color:var(--text-muted);
+                      margin-bottom:4px;">Disposal Method</div>
+          <span style="font-weight:600;">
+            {{ asset.disposal_method|default:"—" }}
+          </span>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;
+                      letter-spacing:0.5px;color:var(--text-muted);
+                      margin-bottom:4px;">Disposal Date</div>
+          <span style="font-weight:600;">
+            {{ asset.disposal_date|date:"d M Y"|default:"—" }}
+          </span>
+        </div>
+        {% if asset.disposal_notes %}
+        <div style="grid-column:1/-1;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;
+                      letter-spacing:0.5px;color:var(--text-muted);
+                      margin-bottom:4px;">Disposal Notes</div>
+          <span>{{ asset.disposal_notes }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if asset.description %}
+    <div class="card" style="padding:24px;">
+      <div class="section-title"><i class="bi bi-sticky-fill"></i> Notes</div>
+      <p style="margin:0;color:var(--text-secondary);line-height:1.7;">{{ asset.description }}</p>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Right column -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+
+    <!-- Status -->
+    <div class="card" style="padding:24px;">
+      <div class="section-title"><i class="bi bi-activity"></i> Status & Condition</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:6px;">Status</div>
+          <span class="badge
+            {% if asset.status == 'ACTIVE' %}badge-active
+            {% elif asset.status == 'UNDER_MAINTENANCE' %}badge-maint
+            {% elif asset.status == 'DISPOSED' %}badge-disposed
+            {% elif asset.status == 'PLANNED' %}badge-planned
+            {% else %}badge-decomm{% endif %}"
+            style="font-size:13px;padding:5px 12px;">
+            {{ asset.get_status_display }}
+          </span>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:6px;">Condition</div>
+          <span class="badge
+            {% if asset.condition == 'EXCELLENT' or asset.condition == 'GOOD' %}badge-active
+            {% elif asset.condition == 'FAIR' %}badge-maint
+            {% else %}badge-delete{% endif %}"
+            style="font-size:13px;padding:5px 12px;">
+            {{ asset.get_condition_display }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Important dates -->
+    <div class="card" style="padding:24px;">
+      <div class="section-title"><i class="bi bi-calendar-event-fill"></i> Important Dates</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:3px;">Acquisition Date</div>
+          <span style="font-weight:600;">{{ asset.acquisition_date|date:"d M Y"|default:"—" }}</span>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:3px;">Warranty Expires</div>
+          <span style="font-weight:600;{% if not asset.warranty_is_active and asset.warranty_expiry_date %}color:var(--danger);{% endif %}">
+            {{ asset.warranty_expiry_date|date:"d M Y"|default:"—" }}
+            {% if asset.warranty_expiry_date and not asset.warranty_is_active %}
+            <span class="badge badge-delete" style="font-size:10px;margin-left:4px;">Expired</span>
+            {% endif %}
+          </span>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:3px;">Asset Expiry Date</div>
+          <span style="font-weight:600;
+            {% if asset.is_expired %}color:var(--danger);
+            {% elif asset.expires_soon %}color:var(--warning);{% endif %}">
+            {{ asset.asset_expiry_date|date:"d M Y"|default:"—" }}
+            {% if asset.is_expired %}
+            <span class="badge badge-delete" style="font-size:10px;margin-left:4px;">Expired</span>
+            {% elif asset.expires_soon %}
+            <span class="badge badge-maint" style="font-size:10px;margin-left:4px;">{{ asset.days_until_expiry }}d left</span>
+            {% endif %}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Financial -->
+    <div class="card" style="padding:24px;">
+      <div class="section-title"><i class="bi bi-currency-dollar"></i> Financial</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:3px;">Acquisition Cost</div>
+          <span style="font-weight:700;font-size:15px;">
+            {% if asset.acquisition_cost %}TZS {{ asset.acquisition_cost|floatformat:0 }}{% else %}—{% endif %}
+          </span>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:3px;">Current Value</div>
+          <span style="font-weight:700;font-size:15px;">
+            {% if asset.current_value %}TZS {{ asset.current_value|floatformat:0 }}{% else %}—{% endif %}
+          </span>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;
+                      letter-spacing:0.5px;color:var(--text-muted);margin-bottom:3px;">
+            Funding Source
+          </div>
+          <span>{{ asset.funding_source|default:"—" }}</span>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;
+                      letter-spacing:0.5px;color:var(--text-muted);
+                      margin-bottom:3px;">Acquisition Method</div>
+          <span>{{ asset.acquisition_method|default:"—" }}</span>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;
+                      letter-spacing:0.5px;color:var(--text-muted);
+                      margin-bottom:3px;">Cost Centre</div>
+          <span>{{ asset.cost_centre|default:"—" }}</span>
+        </div>
+          
+      </div>
+    </div>
+      </div>
+    </div>
+
+    <!-- Record info -->
+    <div class="card" style="padding:20px;">
+      <div class="section-title"><i class="bi bi-clock-history"></i> Record Info</div>
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:12.5px;">
+        <div>
+          <span style="color:var(--text-muted);">Registered by</span><br>
+          <span style="font-weight:600;">{{ asset.registered_by_name|default:"—" }}</span>
+        </div>
+        <div>
+          <span style="color:var(--text-muted);">Date registered</span><br>
+          <span style="font-weight:600;">{{ asset.created_at|date:"d M Y H:i" }}</span>
+        </div>
+        <div>
+          <span style="color:var(--text-muted);">Last updated</span><br>
+          <span style="font-weight:600;">{{ asset.updated_at|date:"d M Y H:i" }}</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

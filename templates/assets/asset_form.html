@@ -1,0 +1,464 @@
+{% extends 'shared/base.html' %}
+{% block title %}{{ page_title }} — GovAsset{% endblock %}
+{% block page_heading %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a href="{% url 'asset_list' %}" class="btn btn-outline btn-sm btn-icon">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <h4>{{ page_title }}</h4>
+      <p>{{ request.user.ministry_schema }}</p>
+    </div>
+  </div>
+</div>
+
+<form method="post">
+{% csrf_token %}
+<div style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start;">
+
+  <!-- Left column -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+
+    <!-- Identification -->
+    <div class="card" style="padding:24px;">
+      <div class="section-title">
+        <i class="bi bi-tag-fill"></i> Identification
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">
+            Asset Number
+            <span style="font-size:11px;font-weight:400;
+                         color:var(--text-muted);margin-left:6px;">
+              (leave blank to auto-generate)
+            </span>
+          </label>
+          <input type="text" name="asset_number" class="form-control"
+                 placeholder="e.g. MOH-ICT-2024-0001"
+                 value="{% if asset %}{{ asset.asset_number }}{% else %}{{ form_data.asset_number|default:'' }}{% endif %}"
+                 {% if is_edit %}readonly
+                 style="background:#f8fafc;color:var(--text-muted);"{% endif %}>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Category <span class="req">*</span></label>
+          <select name="category" class="form-select" required>
+            <option value="">— Select category —</option>
+            {% for cat in categories %}
+            <option value="{{ cat.id }}"
+              {% if asset and asset.category_id == cat.id %}selected
+              {% elif form_data.category == cat.id|stringformat:"s" %}selected
+              {% endif %}>
+              {{ cat.code }} — {{ cat.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group"
+             style="grid-column:1/-1;margin-bottom:0;">
+          <label class="form-label">
+            Asset Name <span class="req">*</span>
+          </label>
+          <input type="text" name="name" class="form-control"
+                 placeholder="e.g. Dell Laptop Latitude 5520"
+                 value="{% if asset %}{{ asset.name }}{% else %}{{ form_data.name|default:'' }}{% endif %}"
+                 required>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Serial Number</label>
+          <input type="text" name="serial_number" class="form-control"
+                 placeholder="Manufacturer serial number"
+                 value="{% if asset %}{{ asset.serial_number|default:'' }}{% else %}{{ form_data.serial_number|default:'' }}{% endif %}">
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Model Number</label>
+          <input type="text" name="model_number" class="form-control"
+                 placeholder="e.g. Latitude 5520"
+                 value="{% if asset %}{{ asset.model_number|default:'' }}{% else %}{{ form_data.model_number|default:'' }}{% endif %}">
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Manufacturer and supplier -->
+    <div class="card" style="padding:24px;">
+      <div class="section-title">
+        <i class="bi bi-building"></i> Manufacturer & Supplier
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Manufacturer</label>
+          <input type="text" name="manufacturer" class="form-control"
+                 placeholder="e.g. Dell, Toyota"
+                 value="{% if asset %}{{ asset.manufacturer|default:'' }}{% else %}{{ form_data.manufacturer|default:'' }}{% endif %}">
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Supplier Name</label>
+          <input type="text" name="supplier_name" class="form-control"
+                 placeholder="Company that supplied this asset"
+                 value="{% if asset %}{{ asset.supplier_name|default:'' }}{% else %}{{ form_data.supplier_name|default:'' }}{% endif %}">
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Purchase Order Number</label>
+          <input type="text" name="purchase_order_number"
+                 class="form-control"
+                 placeholder="Government PO number"
+                 value="{% if asset %}{{ asset.purchase_order_number|default:'' }}{% else %}{{ form_data.purchase_order_number|default:'' }}{% endif %}">
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Useful Life (years)</label>
+          <input type="number" name="useful_life_years"
+                 class="form-control" min="1" max="100"
+                 placeholder="e.g. 5"
+                 value="{% if asset %}{{ asset.useful_life_years|default:'' }}{% else %}{{ form_data.useful_life_years|default:'' }}{% endif %}">
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Location -->
+    <div class="card" style="padding:24px;">
+      <div class="section-title">
+        <i class="bi bi-geo-alt-fill"></i> Location
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Facility / Org Unit</label>
+          <select name="org_unit_id" class="form-select">
+            <option value="">— Select facility —</option>
+            {% for unit in org_units %}
+            <option value="{{ unit.id }}"
+              {% if asset and asset.org_unit_id == unit.id %}selected
+              {% endif %}>
+              {{ unit.name }}
+            </option>
+            {% endfor %}
+          </select>
+          {% if not org_units %}
+          <div class="form-hint" style="color:var(--warning);">
+            <i class="bi bi-exclamation-triangle"></i>
+            No facilities found.
+            <a href="{% url 'org_unit_create' %}"
+               style="color:var(--accent);">
+              Add a facility first
+            </a>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Location Type</label>
+          {% if location_types %}
+          <select name="location_type" class="form-select">
+            <option value="">— Select location type —</option>
+            {% for lt in location_types %}
+            <option value="{{ lt.label }}"
+              {% if asset and asset.location_type == lt.label %}selected
+              {% elif form_data.location_type == lt.label %}selected
+              {% endif %}>
+              {{ lt.label }}
+            </option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <input type="text" name="location_type"
+                 class="form-control"
+                 placeholder="e.g. Office Building"
+                 value="{% if asset %}{{ asset.location_type|default:'' }}{% else %}{{ form_data.location_type|default:'' }}{% endif %}">
+          <div class="form-hint">
+            Add location types in
+            <a href="{% url 'master_data_list' %}"
+               style="color:var(--accent);">Master Data</a>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="form-group"
+             style="grid-column:1/-1;margin-bottom:0;">
+          <label class="form-label">Location Description</label>
+          <input type="text" name="location_description"
+                 class="form-control"
+                 placeholder="e.g. Block A, Room 204, Second Floor"
+                 value="{% if asset %}{{ asset.location_description|default:'' }}{% else %}{{ form_data.location_description|default:'' }}{% endif %}">
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Financial -->
+    <div class="card" style="padding:24px;">
+      <div class="section-title">
+        <i class="bi bi-currency-dollar"></i> Financial Information
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Acquisition Date</label>
+          <input type="date" name="acquisition_date"
+                 class="form-control"
+                 value="{% if asset %}{{ asset.acquisition_date|date:'Y-m-d'|default:'' }}{% else %}{{ form_data.acquisition_date|default:'' }}{% endif %}">
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Acquisition Cost (TZS)</label>
+          <input type="number" name="acquisition_cost"
+                 class="form-control" step="0.01" min="0"
+                 placeholder="0.00"
+                 value="{% if asset %}{{ asset.acquisition_cost|default:'' }}{% else %}{{ form_data.acquisition_cost|default:'' }}{% endif %}">
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Current Value (TZS)</label>
+          <input type="number" name="current_value"
+                 class="form-control" step="0.01" min="0"
+                 placeholder="0.00"
+                 value="{% if asset %}{{ asset.current_value|default:'' }}{% else %}{{ form_data.current_value|default:'' }}{% endif %}">
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Funding Source</label>
+          {% if funding_sources %}
+          <select name="funding_source" class="form-select">
+            <option value="">— Select funding source —</option>
+            {% for fs in funding_sources %}
+            <option value="{{ fs.label }}"
+              {% if asset and asset.funding_source == fs.label %}selected
+              {% elif form_data.funding_source == fs.label %}selected
+              {% endif %}>
+              {{ fs.label }}
+            </option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <input type="text" name="funding_source"
+                 class="form-control"
+                 placeholder="e.g. Government Budget"
+                 value="{% if asset %}{{ asset.funding_source|default:'' }}{% else %}{{ form_data.funding_source|default:'' }}{% endif %}">
+          <div class="form-hint">
+            Add in <a href="{% url 'master_data_list' %}"
+                      style="color:var(--accent);">Master Data</a>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Acquisition Method</label>
+          {% if acquisition_methods %}
+          <select name="acquisition_method" class="form-select">
+            <option value="">— Select method —</option>
+            {% for am in acquisition_methods %}
+            <option value="{{ am.label }}"
+              {% if asset and asset.acquisition_method == am.label %}selected
+              {% elif form_data.acquisition_method == am.label %}selected
+              {% endif %}>
+              {{ am.label }}
+            </option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <input type="text" name="acquisition_method"
+                 class="form-control"
+                 placeholder="e.g. Direct Purchase"
+                 value="{% if asset %}{{ asset.acquisition_method|default:'' }}{% else %}{{ form_data.acquisition_method|default:'' }}{% endif %}">
+          <div class="form-hint">
+            Add in <a href="{% url 'master_data_list' %}"
+                      style="color:var(--accent);">Master Data</a>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Cost Centre</label>
+          {% if cost_centres %}
+          <select name="cost_centre" class="form-select">
+            <option value="">— Select cost centre —</option>
+            {% for cc in cost_centres %}
+            <option value="{{ cc.label }}"
+              {% if asset and asset.cost_centre == cc.label %}selected
+              {% elif form_data.cost_centre == cc.label %}selected
+              {% endif %}>
+              {{ cc.label }}
+            </option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <input type="text" name="cost_centre"
+                 class="form-control"
+                 placeholder="e.g. ICT Department"
+                 value="{% if asset %}{{ asset.cost_centre|default:'' }}{% else %}{{ form_data.cost_centre|default:'' }}{% endif %}">
+          <div class="form-hint">
+            Add in <a href="{% url 'master_data_list' %}"
+                      style="color:var(--accent);">Master Data</a>
+          </div>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Disposal — only shown when editing and status is Disposed -->
+    {% if is_edit and asset.status == 'DISPOSED' %}
+    <div class="card" style="padding:24px;border-color:var(--danger-border);">
+      <div class="section-title" style="color:var(--danger);">
+        <i class="bi bi-trash-fill"></i> Disposal Information
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Disposal Method</label>
+          {% if disposal_methods %}
+          <select name="disposal_method" class="form-select">
+            <option value="">— Select method —</option>
+            {% for dm in disposal_methods %}
+            <option value="{{ dm.label }}"
+              {% if asset.disposal_method == dm.label %}selected{% endif %}>
+              {{ dm.label }}
+            </option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <input type="text" name="disposal_method"
+                 class="form-control"
+                 placeholder="e.g. Public Auction"
+                 value="{{ asset.disposal_method|default:'' }}">
+          {% endif %}
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Disposal Date</label>
+          <input type="date" name="disposal_date"
+                 class="form-control"
+                 value="{{ asset.disposal_date|date:'Y-m-d'|default:'' }}">
+        </div>
+
+        <div class="form-group"
+             style="grid-column:1/-1;margin-bottom:0;">
+          <label class="form-label">Disposal Notes</label>
+          <textarea name="disposal_notes" class="form-control"
+                    rows="2"
+                    placeholder="Reason for disposal, auction reference etc.">{{ asset.disposal_notes|default:'' }}</textarea>
+        </div>
+
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Notes -->
+    <div class="card" style="padding:24px;">
+      <div class="section-title">
+        <i class="bi bi-sticky-fill"></i> Additional Notes
+      </div>
+      <textarea name="description" class="form-control" rows="3"
+                placeholder="Any additional details about this asset...">{% if asset %}{{ asset.description|default:'' }}{% else %}{{ form_data.description|default:'' }}{% endif %}</textarea>
+    </div>
+
+  </div>
+
+  <!-- Right column -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+
+    <!-- Status and condition -->
+    <div class="card" style="padding:24px;">
+      <div class="section-title">
+        <i class="bi bi-activity"></i> Status & Condition
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select name="status" class="form-select">
+          {% for value, label in STATUS_CHOICES %}
+          <option value="{{ value }}"
+            {% if asset and asset.status == value %}selected
+            {% elif not asset and value == 'ACTIVE' %}selected{% endif %}>
+            {{ label }}
+          </option>
+          {% endfor %}
+        </select>
+        {% if is_edit %}
+        <div class="form-hint">
+          Changing to <strong>Disposed</strong> will reveal the
+          Disposal Information section below.
+          Save first, then edit again to fill disposal details.
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Condition</label>
+        <select name="condition" class="form-select">
+          {% for value, label in CONDITION_CHOICES %}
+          <option value="{{ value }}"
+            {% if asset and asset.condition == value %}selected
+            {% elif not asset and value == 'GOOD' %}selected{% endif %}>
+            {{ label }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <!-- Important dates -->
+    <div class="card" style="padding:24px;">
+      <div class="section-title">
+        <i class="bi bi-calendar-event-fill"></i> Important Dates
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Warranty Expiry Date</label>
+        <input type="date" name="warranty_expiry_date"
+               class="form-control"
+               value="{% if asset %}{{ asset.warranty_expiry_date|date:'Y-m-d'|default:'' }}{% endif %}">
+        <div class="form-hint">Date manufacturer warranty expires</div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Asset Expiry Date</label>
+        <input type="date" name="asset_expiry_date"
+               class="form-control"
+               value="{% if asset %}{{ asset.asset_expiry_date|date:'Y-m-d'|default:'' }}{% endif %}">
+        <div class="form-hint">
+          For fire extinguishers, licenses, medical equipment.
+          Dashboard warns 90 days before expiry.
+        </div>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <div class="card" style="padding:20px;">
+      <button type="submit" class="btn btn-primary"
+              style="width:100%;justify-content:center;">
+        <i class="bi bi-{% if is_edit %}check-circle-fill{% else %}plus-circle-fill{% endif %}"></i>
+        {% if is_edit %}Save Changes{% else %}Register Asset{% endif %}
+      </button>
+      <a href="{% url 'asset_list' %}" class="btn btn-outline"
+         style="width:100%;justify-content:center;margin-top:8px;">
+        Cancel
+      </a>
+      {% if not is_edit %}
+      <div style="margin-top:12px;padding:10px;
+                  background:var(--accent-light);
+                  border-radius:var(--radius-md);
+                  font-size:12px;color:#1e40af;">
+        <i class="bi bi-info-circle"></i>
+        Leave Asset Number blank — it will be auto-generated as
+        <strong>MOH-ICT-2024-0001</strong>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+</form>
+{% endblock %}

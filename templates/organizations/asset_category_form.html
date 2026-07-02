@@ -1,0 +1,137 @@
+{% extends 'shared/base.html' %}
+{% block title %}{{ page_title }} — GovAsset{% endblock %}
+{% block page_heading %}Asset Categories{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a href="{% url 'asset_category_list' %}"
+       class="btn btn-outline btn-sm btn-icon">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <h4>{{ page_title }}</h4>
+      <p>New categories appear immediately in the asset registration form</p>
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 300px;
+            gap:20px;align-items:start;">
+
+  <div class="card" style="padding:28px;">
+    <form method="post">
+      {% csrf_token %}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+        <div class="form-group"
+             style="grid-column:1/-1;margin-bottom:0;">
+          <label class="form-label">
+            Category Name <span class="req">*</span>
+          </label>
+          <input type="text" name="name" class="form-control"
+                 placeholder="e.g. Medical Equipment"
+                 value="{{ form_data.name|default:'' }}"
+                 required autofocus>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">
+            Category Code <span class="req">*</span>
+          </label>
+          <input type="text" name="code" class="form-control"
+                 placeholder="e.g. MED"
+                 maxlength="10"
+                 value="{{ form_data.code|default:'' }}"
+                 oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+                 required>
+          <div class="form-hint">
+            Uppercase letters and numbers only. Max 10 characters.
+            Used in asset numbers — <strong>cannot be changed later.</strong>
+          </div>
+        </div>
+
+        <!-- Live preview of asset number format -->
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Asset Number Preview</label>
+          <div style="padding:9px 13px;background:var(--bg-page);
+                      border:1.5px solid var(--border);
+                      border-radius:var(--radius-md);
+                      font-family:var(--font-mono);
+                      font-size:13px;color:var(--accent);"
+               id="preview">
+            MOH-???-2024-0001
+          </div>
+          <div class="form-hint">
+            Preview updates as you type the code
+          </div>
+        </div>
+
+        <div class="form-group"
+             style="grid-column:1/-1;margin-bottom:0;">
+          <label class="form-label">Description</label>
+          <textarea name="description" class="form-control"
+                    rows="2"
+                    placeholder="Brief description of what assets belong in this category...">{{ form_data.description|default:'' }}</textarea>
+        </div>
+
+        <div style="grid-column:1/-1;margin-top:8px;display:flex;gap:8px;">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-plus-circle-fill"></i> Create Category
+          </button>
+          <a href="{% url 'asset_category_list' %}"
+             class="btn btn-outline">Cancel</a>
+        </div>
+
+      </div>
+    </form>
+  </div>
+
+  <!-- Info panel -->
+  <div style="display:flex;flex-direction:column;gap:14px;">
+
+    <div class="card" style="padding:20px;">
+      <div class="section-title">
+        <i class="bi bi-tags"></i> Existing Categories
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        {% for cat in existing_categories %}
+        <div style="display:flex;justify-content:space-between;
+                    align-items:center;font-size:13px;">
+          <span>{{ cat.name }}</span>
+          <code style="font-size:11px;">{{ cat.code }}</code>
+        </div>
+        {% empty %}
+        <div style="color:var(--text-muted);font-size:13px;">
+          No categories yet
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div style="padding:12px 14px;background:var(--warning-bg);
+                border:1px solid var(--warning-border);
+                border-radius:var(--radius-md);
+                font-size:12.5px;color:var(--warning);line-height:1.6;">
+      <i class="bi bi-exclamation-triangle-fill"
+         style="margin-right:6px;"></i>
+      The code is permanent. Choose carefully —
+      it will appear in every asset number for this category.
+    </div>
+
+  </div>
+</div>
+
+<script>
+const codeInput = document.querySelector('[name=code]');
+const preview   = document.getElementById('preview');
+const schema    = '{{ request.user.ministry_schema }}'
+                  .replace('_schema','').toUpperCase();
+
+codeInput.addEventListener('input', function() {
+  const code = this.value || '???';
+  const year = new Date().getFullYear();
+  preview.textContent = `${schema}-${code}-${year}-0001`;
+});
+</script>
+{% endblock %}

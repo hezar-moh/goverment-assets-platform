@@ -1,0 +1,137 @@
+{% extends 'shared/base.html' %}
+{% block title %}Users — GovAsset{% endblock %}
+{% block page_heading %}User Management{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h4>System Users</h4>
+    <p>
+      {% if paginator %}
+      <strong>{{ paginator.count }}</strong>
+      user{{ paginator.count|pluralize }} found
+      {% else %}
+      {{ users|length }} user{{ users|length|pluralize }} found
+      {% endif %}
+    </p>
+  </div>
+  {% if can_create %}
+  <a href="{% url 'user_create' %}" class="btn btn-primary">
+    <i class="bi bi-person-plus-fill"></i> Add User
+  </a>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div style="overflow-x:auto;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Ministry Schema</th>
+          <th>Status</th>
+          <th>Joined</th>
+          <th style="text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr style="{% if not u.is_active %}opacity:0.55;{% endif %}">
+          <td>
+            <div class="user-cell">
+              <div class="avatar
+                {% if u.role == 'SUPER_ADMIN' %}avatar-red
+                {% elif u.role == 'MINISTRY_ADMIN' %}avatar-blue
+                {% elif u.role == 'AGENCY_MANAGER' %}avatar-teal
+                {% elif u.role == 'FACILITY_CLERK' %}avatar-green
+                {% else %}avatar-purple{% endif %}">
+                {{ u.first_name|slice:":1"|upper }}{{ u.last_name|slice:":1"|upper }}
+              </div>
+              <div>
+                <div class="user-cell-name">{{ u.get_full_name|default:u.username }}</div>
+                <div class="user-cell-sub">@{{ u.username }}</div>
+              </div>
+            </div>
+          </td>
+          <td style="color:var(--text-secondary);font-size:13px;">
+            {{ u.email|default:"—" }}
+          </td>
+          <td>
+            <span class="badge
+              {% if u.role == 'SUPER_ADMIN' %}badge-role-super
+              {% elif u.role == 'MINISTRY_ADMIN' %}badge-role-mAdmin
+              {% elif u.role == 'AGENCY_MANAGER' %}badge-role-agency
+              {% elif u.role == 'FACILITY_CLERK' %}badge-role-clerk
+              {% else %}badge-role-auditor{% endif %}">
+              {{ u.role }}
+            </span>
+          </td>
+          <td><code>{{ u.ministry_schema|default:"—" }}</code></td>
+          <td>
+            <span class="status-dot {% if u.is_active %}active{% else %}inactive{% endif %}"></span>
+            {% if u.is_active %}Active{% else %}Inactive{% endif %}
+          </td>
+          <td style="color:var(--text-muted);font-size:12.5px;">
+            {{ u.date_joined|date:"d M Y" }}
+          </td>
+          <td>
+            <div style="display:flex;gap:4px;justify-content:flex-end;">
+
+              {% if u.id != editor_id %}
+
+                {% if editor_role == 'SUPER_ADMIN' or editor_role == 'MINISTRY_ADMIN' and u.ministry_schema == editor_schema %}
+                <a href="{% url 'user_edit' u.id %}"
+                   class="btn btn-outline btn-sm btn-icon" title="Edit user">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                {% endif %}
+
+                {% if editor_role == 'SUPER_ADMIN' or editor_role == 'MINISTRY_ADMIN' and u.ministry_schema == editor_schema %}
+                {% if u.role != 'SUPER_ADMIN' or editor_role == 'SUPER_ADMIN' %}
+                <form method="post" action="{% url 'user_toggle_active' u.id %}"
+                      style="display:inline;"
+                      onsubmit="return confirm('{% if u.is_active %}Deactivate{% else %}Activate{% endif %} {{ u.username }}?')">
+                  {% csrf_token %}
+                  <button type="submit"
+                          class="btn btn-sm btn-icon {% if u.is_active %}btn-danger-outline{% else %}btn-outline{% endif %}"
+                          title="{% if u.is_active %}Deactivate{% else %}Activate{% endif %}">
+                    <i class="bi bi-{% if u.is_active %}person-slash{% else %}person-check{% endif %}"></i>
+                  </button>
+                </form>
+                {% endif %}
+                {% endif %}
+
+                {% if editor_role == 'SUPER_ADMIN' or editor_role == 'MINISTRY_ADMIN' and u.ministry_schema == editor_schema %}
+                <a href="{% url 'user_reset_password' u.id %}"
+                   class="btn btn-outline btn-sm btn-icon" title="Reset password">
+                  <i class="bi bi-key"></i>
+                </a>
+                {% endif %}
+
+              {% else %}
+              <span style="font-size:12px;color:var(--text-muted);padding:0 8px;">You</span>
+              {% endif %}
+
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7">
+            <div class="empty-state">
+              <i class="bi bi-people"></i>
+              <p>No users found.</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if page %}
+  {% include 'shared/pagination.html' %}
+  {% endif %}
+</div>
+{% endblock %}

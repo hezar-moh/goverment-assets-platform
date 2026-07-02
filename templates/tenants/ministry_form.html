@@ -1,0 +1,175 @@
+{% extends 'shared/base.html' %}
+{% block title %}Onboard Ministry — GovAsset{% endblock %}
+{% block page_heading %}Onboard Ministry{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a href="{% url 'ministry_list' %}" class="btn btn-outline btn-sm btn-icon">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <h4>Onboard New Ministry</h4>
+      <p>Creates a private PostgreSQL schema and migrates all tables automatically</p>
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start;">
+
+  <div class="card" style="padding:28px;">
+    <form method="post">
+      {% csrf_token %}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+        <div class="form-group" style="grid-column:1/-1;margin-bottom:0;">
+          <label class="form-label">
+            Full Ministry Name <span class="req">*</span>
+          </label>
+          <input type="text" name="name" class="form-control"
+                 placeholder="e.g. Ministry of Education"
+                 value="{{ form_data.name|default:'' }}"
+                 required autofocus>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">
+            Short Name / Abbreviation <span class="req">*</span>
+          </label>
+          <input type="text" name="short_name" class="form-control"
+                 placeholder="e.g. MOE"
+                 maxlength="10"
+                 value="{{ form_data.short_name|default:'' }}"
+                 required
+                 oninput="this.value = this.value.toUpperCase(); autoFill()">
+          <div class="form-hint">Maximum 10 characters. Will be used in asset numbers.</div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">
+            Schema Name <span class="req">*</span>
+          </label>
+          <input type="text" name="schema_name" id="schema_name"
+                 class="form-control"
+                 placeholder="e.g. moe_schema"
+                 value="{{ form_data.schema_name|default:'' }}"
+                 required
+                 pattern="[a-z][a-z0-9_]*_schema"
+                 oninput="this.value = this.value.toLowerCase()">
+          <div class="form-hint">
+            Lowercase letters, numbers, underscores only. Must end with
+            <code>_schema</code>. Example: <code>moe_schema</code>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">
+            Domain <span class="req">*</span>
+          </label>
+          <input type="text" name="domain" id="domain_field"
+                 class="form-control"
+                 placeholder="e.g. moe.localhost"
+                 value="{{ form_data.domain|default:'' }}"
+                 required
+                 oninput="this.value = this.value.toLowerCase()">
+          <div class="form-hint">
+            Must match your Windows hosts file entry.
+            Example: <code>moe.localhost</code>
+          </div>
+        </div>
+
+        <div style="grid-column:1/-1;margin-top:8px;display:flex;gap:8px;">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-plus-circle-fill"></i> Create Ministry & Schema
+          </button>
+          <a href="{% url 'ministry_list' %}" class="btn btn-outline">
+            Cancel
+          </a>
+        </div>
+
+      </div>
+    </form>
+  </div>
+
+  <!-- Info panel -->
+  <div style="display:flex;flex-direction:column;gap:14px;">
+
+    <div class="card" style="padding:20px;">
+      <div class="section-title">
+        <i class="bi bi-info-circle"></i> What happens when you submit
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;
+                  color:var(--text-secondary);line-height:1.6;">
+        <div style="display:flex;gap:8px;">
+          <span style="color:var(--accent);font-weight:700;flex-shrink:0;">1.</span>
+          Ministry record is saved to the public schema
+        </div>
+        <div style="display:flex;gap:8px;">
+          <span style="color:var(--accent);font-weight:700;flex-shrink:0;">2.</span>
+          PostgreSQL executes <code>CREATE SCHEMA</code> automatically
+        </div>
+        <div style="display:flex;gap:8px;">
+          <span style="color:var(--accent);font-weight:700;flex-shrink:0;">3.</span>
+          All ministry tables are migrated into the new schema
+        </div>
+        <div style="display:flex;gap:8px;">
+          <span style="color:var(--accent);font-weight:700;flex-shrink:0;">4.</span>
+          Domain is registered for routing
+        </div>
+        <div style="display:flex;gap:8px;">
+          <span style="color:var(--accent);font-weight:700;flex-shrink:0;">5.</span>
+          Root org unit is created automatically
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:12px 14px;background:var(--warning-bg);
+                border:1px solid var(--warning-border);
+                border-radius:var(--radius-md);font-size:12.5px;
+                color:var(--warning);line-height:1.6;">
+      <i class="bi bi-exclamation-triangle-fill" style="margin-right:6px;"></i>
+      After creating a ministry add its domain to your Windows
+      hosts file: <code>127.0.0.1 moe.localhost</code>
+    </div>
+
+    <div class="card" style="padding:20px;">
+      <div class="section-title">
+        <i class="bi bi-building"></i> Existing Schemas
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        {% for item in existing %}
+        <div style="display:flex;justify-content:space-between;font-size:12.5px;">
+          <span style="color:var(--text-secondary);">{{ item.name }}</span>
+          <code>{{ item.schema_name }}</code>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function autoFill() {
+    const short = document.querySelector('[name=short_name]').value.toLowerCase();
+    const schemaField = document.getElementById('schema_name');
+    const domainField = document.getElementById('domain_field');
+    if (schemaField.value === '' || schemaField.dataset.autofilled === 'true') {
+      schemaField.value = short ? short + '_schema' : '';
+      schemaField.dataset.autofilled = 'true';
+    }
+    if (domainField.value === '' || domainField.dataset.autofilled === 'true') {
+      domainField.value = short ? short + '.localhost' : '';
+      domainField.dataset.autofilled = 'true';
+    }
+  }
+
+  // Stop auto-fill if user manually types in the field
+  document.getElementById('schema_name').addEventListener('input', function() {
+    this.dataset.autofilled = 'false';
+  });
+  document.getElementById('domain_field').addEventListener('input', function() {
+    this.dataset.autofilled = 'false';
+  });
+</script>
+{% endblock %}

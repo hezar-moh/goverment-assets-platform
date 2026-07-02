@@ -1,0 +1,324 @@
+{% extends 'shared/base.html' %}
+{% block title %}Dashboard — GovAsset{% endblock %}
+{% block page_heading %}Dashboard{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h4>{{ page_title }}</h4>
+    <p>Welcome back, <strong>{{ user.get_full_name|default:user.username }}</strong></p>
+  </div>
+</div>
+
+<div class="stat-grid">
+  {% if user.role == 'SUPER_ADMIN' %}
+    <div class="stat-card">
+      <div class="stat-icon blue"><i class="bi bi-building-fill"></i></div>
+      <div>
+        <div class="stat-value">{{ total_ministries }}</div>
+        <div class="stat-label">Active Ministries</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon purple"><i class="bi bi-people-fill"></i></div>
+      <div>
+        <div class="stat-value">{{ total_users }}</div>
+        <div class="stat-label">Platform Users</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon blue"><i class="bi bi-box-seam-fill"></i></div>
+      <div>
+        <div class="stat-value">{{ total_assets }}</div>
+        <div class="stat-label">Total Assets (all ministries)</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon green"><i class="bi bi-check-circle-fill"></i></div>
+      <div>
+        <div class="stat-value">{{ active_assets }}</div>
+        <div class="stat-label">Active Assets</div>
+      </div>
+    </div>
+  {% else %}
+    <div class="stat-card">
+      <div class="stat-icon blue"><i class="bi bi-box-seam-fill"></i></div>
+      <div>
+        <div class="stat-value">{{ total_assets }}</div>
+        <div class="stat-label">Total Assets</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon green"><i class="bi bi-check-circle-fill"></i></div>
+      <div>
+        <div class="stat-value">{{ active_assets }}</div>
+        <div class="stat-label">Active Assets</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon amber"><i class="bi bi-journal-text"></i></div>
+      <div>
+        <div class="stat-value">{{ total_audit_records }}</div>
+        <div class="stat-label">Audit Records</div>
+      </div>
+    </div>
+    <div class="stat-card" style="{% if total_warnings > 0 %}border-color:var(--danger-border);{% endif %}">
+      <div class="stat-icon {% if total_warnings > 0 %}red{% else %}green{% endif %}">
+        <i class="bi bi-{% if total_warnings > 0 %}exclamation-triangle-fill{% else %}shield-check{% endif %}"></i>
+      </div>
+      <div>
+        <div class="stat-value" style="{% if total_warnings > 0 %}color:var(--danger);{% endif %}">
+          {{ total_warnings }}
+        </div>
+        <div class="stat-label">Expiry Warnings</div>
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+{% if user.role != 'SUPER_ADMIN' %}
+
+  {% if expired_assets %}
+  <div class="card" style="margin-bottom:16px;border-color:var(--danger-border);">
+    <div class="card-header-bar" style="background:var(--danger-bg);">
+      <h6 style="color:var(--danger);display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        Expired Assets
+        <span style="background:var(--danger);color:#fff;border-radius:100px;padding:1px 8px;font-size:11px;">
+          {{ expired_assets|length }}
+        </span>
+      </h6>
+      <a href="{% url 'asset_list' %}" class="btn btn-sm btn-outline"
+         style="border-color:var(--danger-border);color:var(--danger);">
+        View all
+      </a>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Asset No.</th>
+            <th>Name</th>
+            <th>Category</th>
+            <th>Expired On</th>
+            <th>Days Overdue</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for asset in expired_assets %}
+          <tr>
+            <td><code>{{ asset.asset_number }}</code></td>
+            <td style="font-weight:600;">{{ asset.name }}</td>
+            <td>{{ asset.category.name }}</td>
+            <td style="color:var(--danger);font-weight:600;">
+              {{ asset.asset_expiry_date|date:"d M Y" }}
+            </td>
+            <td>
+              <span class="badge badge-delete">
+                {{ asset.days_until_expiry|cut:"-" }} days overdue
+              </span>
+            </td>
+            <td>
+              <a href="{% url 'asset_detail' asset.id %}" class="btn btn-sm btn-outline btn-icon">
+                <i class="bi bi-eye"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if expiring_soon %}
+  <div class="card" style="margin-bottom:16px;border-color:var(--warning-border);">
+    <div class="card-header-bar" style="background:var(--warning-bg);">
+      <h6 style="color:var(--warning);display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-clock-fill"></i>
+        Expiring Within 30 Days
+        <span style="background:var(--warning);color:#fff;border-radius:100px;padding:1px 8px;font-size:11px;">
+          {{ expiring_soon|length }}
+        </span>
+      </h6>
+      <a href="{% url 'asset_list' %}" class="btn btn-sm btn-outline"
+         style="border-color:var(--warning-border);color:var(--warning);">
+        View all
+      </a>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Asset No.</th>
+            <th>Name</th>
+            <th>Category</th>
+            <th>Expires On</th>
+            <th>Days Left</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for asset in expiring_soon %}
+          <tr>
+            <td><code>{{ asset.asset_number }}</code></td>
+            <td style="font-weight:600;">{{ asset.name }}</td>
+            <td>{{ asset.category.name }}</td>
+            <td style="color:var(--warning);font-weight:600;">
+              {{ asset.asset_expiry_date|date:"d M Y" }}
+            </td>
+            <td>
+              <span class="badge badge-maint">
+                {{ asset.days_until_expiry }} days
+              </span>
+            </td>
+            <td>
+              <a href="{% url 'asset_detail' asset.id %}" class="btn btn-sm btn-outline btn-icon">
+                <i class="bi bi-eye"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if expiring_later %}
+  <div class="card" style="margin-bottom:16px;border-color:var(--info-border);">
+    <div class="card-header-bar" style="background:var(--info-bg);">
+      <h6 style="color:var(--info);display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-calendar-event-fill"></i>
+        Expiring in 31–90 Days
+        <span style="background:var(--info);color:#fff;border-radius:100px;padding:1px 8px;font-size:11px;">
+          {{ expiring_later|length }}
+        </span>
+      </h6>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Asset No.</th>
+            <th>Name</th>
+            <th>Category</th>
+            <th>Expires On</th>
+            <th>Days Left</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for asset in expiring_later %}
+          <tr>
+            <td><code>{{ asset.asset_number }}</code></td>
+            <td style="font-weight:600;">{{ asset.name }}</td>
+            <td>{{ asset.category.name }}</td>
+            <td style="color:var(--info);font-weight:600;">
+              {{ asset.asset_expiry_date|date:"d M Y" }}
+            </td>
+            <td>
+              <span class="badge badge-planned">
+                {{ asset.days_until_expiry }} days
+              </span>
+            </td>
+            <td>
+              <a href="{% url 'asset_detail' asset.id %}" class="btn btn-sm btn-outline btn-icon">
+                <i class="bi bi-eye"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if not expired_assets and not expiring_soon and not expiring_later %}
+  <div style="padding:14px 18px;background:var(--success-bg);
+              border:1px solid var(--success-border);
+              border-radius:var(--radius-md);
+              display:flex;align-items:center;gap:10px;
+              margin-bottom:16px;">
+    <i class="bi bi-shield-check-fill" style="color:var(--success);font-size:18px;"></i>
+    <span style="font-size:13.5px;color:var(--success);font-weight:600;">
+      All clear — no asset expiry warnings at this time.
+    </span>
+  </div>
+  {% endif %}
+
+{% endif %}
+
+{% if recent_audit %}
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-header-bar">
+    <h6>
+      <i class="bi bi-clock-history" style="margin-right:6px;color:var(--text-muted);"></i>
+      Recent Activity
+    </h6>
+    <a href="{% url 'audit_log' %}" class="btn btn-outline btn-sm">View all</a>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Action</th>
+          <th>Module</th>
+          <th>Description</th>
+          <th>Performed By</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in recent_audit %}
+        <tr>
+          <td>
+            <span class="badge
+              {% if log.action == 'CREATE' %}badge-create
+              {% elif log.action == 'UPDATE' %}badge-update
+              {% elif log.action == 'DELETE' %}badge-delete
+              {% elif log.action == 'LOGIN' %}badge-login
+              {% elif log.action == 'LOGOUT' %}badge-logout
+              {% else %}badge-denied{% endif %}">
+              {{ log.action }}
+            </span>
+          </td>
+          <td><code style="font-size:11.5px;">{{ log.model_name }}</code></td>
+          <td style="color:var(--text-secondary);font-size:13px;">
+            {{ log.object_repr|truncatechars:45 }}
+          </td>
+          <td>
+            <div class="user-cell">
+              <div class="avatar avatar-blue" style="width:26px;height:26px;font-size:10px;">
+                {{ log.performed_by_name|slice:":2"|upper }}
+              </div>
+              <span style="font-size:13px;font-weight:500;">
+                {{ log.performed_by_name }}
+              </span>
+            </div>
+          </td>
+          <td style="color:var(--text-muted);font-size:12px;white-space:nowrap;">
+            {{ log.timestamp|date:"d M Y H:i" }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div style="padding:12px 16px;background:var(--accent-light);
+            border:1px solid #bfdbfe;border-radius:var(--radius-md);
+            display:flex;align-items:center;gap:8px;">
+  <i class="bi bi-database-check" style="color:var(--accent);"></i>
+  <span style="font-size:13px;color:#1e40af;">
+    Active schema: <code>{{ ministry_schema|default:"public" }}</code> —
+    Data isolation confirmed. Cross-ministry access is blocked at the database level.
+  </span>
+</div>
+
+{% endblock %}

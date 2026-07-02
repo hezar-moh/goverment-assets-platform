@@ -1,0 +1,182 @@
+{% extends 'shared/base.html' %}
+{% block title %}{{ ministry.name }} — GovAsset{% endblock %}
+{% block page_heading %}Ministry Detail{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a href="{% url 'ministry_list' %}" class="btn btn-outline btn-sm btn-icon">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <h4>{{ ministry.name }}</h4>
+      <p>
+        Schema: <code>{{ ministry.schema_name }}</code>
+        &nbsp;·&nbsp;
+        Domain: <code>{{ primary_domain.domain|default:"—" }}</code>
+      </p>
+    </div>
+  </div>
+  <form method="post" action="{% url 'ministry_toggle_active' ministry.id %}"
+        onsubmit="return confirm('{% if ministry.is_active %}Deactivate{% else %}Activate{% endif %} this ministry?')">
+    {% csrf_token %}
+    <button type="submit"
+            class="btn {% if ministry.is_active %}btn-danger-outline{% else %}btn-outline{% endif %} btn-sm">
+      <i class="bi bi-{% if ministry.is_active %}pause-circle{% else %}play-circle{% endif %}"></i>
+      {% if ministry.is_active %}Deactivate{% else %}Activate{% endif %}
+    </button>
+  </form>
+</div>
+
+<!-- Stats row -->
+<div class="stat-grid" style="margin-bottom:20px;">
+  <div class="stat-card">
+    <div class="stat-icon blue"><i class="bi bi-box-seam-fill"></i></div>
+    <div>
+      <div class="stat-value">{{ asset_count }}</div>
+      <div class="stat-label">Total Assets</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon purple"><i class="bi bi-people-fill"></i></div>
+    <div>
+      <div class="stat-value">{{ users|length }}</div>
+      <div class="stat-label">Users</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon teal"><i class="bi bi-diagram-3-fill"></i></div>
+    <div>
+      <div class="stat-value">{{ org_units|length }}</div>
+      <div class="stat-label">Org Units</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon {% if ministry.is_active %}green{% else %}red{% endif %}">
+      <i class="bi bi-{% if ministry.is_active %}check-circle-fill{% else %}pause-circle-fill{% endif %}"></i>
+    </div>
+    <div>
+      <div class="stat-value" style="font-size:18px;">
+        {% if ministry.is_active %}Active{% else %}Inactive{% endif %}
+      </div>
+      <div class="stat-label">Status</div>
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+
+  <!-- Users -->
+  <div class="card">
+    <div class="card-header-bar">
+      <h6><i class="bi bi-people-fill" style="margin-right:6px;"></i> Users</h6>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td>
+              <div class="user-cell">
+                <div class="avatar avatar-blue"
+                     style="width:28px;height:28px;font-size:10px;">
+                  {{ u.first_name|slice:":1"|upper }}{{ u.last_name|slice:":1"|upper }}
+                </div>
+                <div>
+                  <div style="font-weight:600;font-size:13px;">
+                    {{ u.get_full_name|default:u.username }}
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="badge
+                {% if u.role == 'MINISTRY_ADMIN' %}badge-role-mAdmin
+                {% elif u.role == 'AGENCY_MANAGER' %}badge-role-agency
+                {% elif u.role == 'FACILITY_CLERK' %}badge-role-clerk
+                {% else %}badge-role-auditor{% endif %}"
+                style="font-size:10.5px;">
+                {{ u.role }}
+              </span>
+            </td>
+            <td>
+              <span class="status-dot
+                {% if u.is_active %}active{% else %}inactive{% endif %}">
+              </span>
+              {% if u.is_active %}Active{% else %}Inactive{% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="3" style="text-align:center;padding:24px;
+                                   color:var(--text-muted);font-size:13px;">
+              No users yet
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Org units -->
+  <div class="card">
+    <div class="card-header-bar">
+      <h6>
+        <i class="bi bi-diagram-3-fill" style="margin-right:6px;"></i>
+        Organisation Units
+      </h6>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Code</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for unit in org_units %}
+          <tr>
+            <td style="font-weight:600;font-size:13px;">
+              {% if unit.unit_type == 'AGENCY' %}
+                <span style="margin-left:12px;color:var(--text-muted);">└</span>
+              {% elif unit.unit_type == 'FACILITY' %}
+                <span style="margin-left:24px;color:var(--text-muted);">└</span>
+              {% endif %}
+              {{ unit.name }}
+            </td>
+            <td>
+              <span class="badge
+                {% if unit.unit_type == 'MINISTRY' %}badge-role-mAdmin
+                {% elif unit.unit_type == 'AGENCY' %}badge-role-agency
+                {% else %}badge-role-clerk{% endif %}"
+                style="font-size:10.5px;">
+                {{ unit.unit_type }}
+              </span>
+            </td>
+            <td><code style="font-size:11px;">{{ unit.code|default:"—" }}</code></td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="3" style="text-align:center;padding:24px;
+                                   color:var(--text-muted);font-size:13px;">
+              No org units yet
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

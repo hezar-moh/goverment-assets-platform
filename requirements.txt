@@ -1,0 +1,27 @@
+django
+django-tenants
+djangorestframework
+djangorestframework-simplejwt
+mozilla-django-oidc
+django-cors-headers
+python-decouple
+psycopg2-binary
+Pillow
+requests
+pytest-django
+drf-yasg
+
+
+# Why each package:
+
+# django — the web framework
+# django-tenants — creates a separate PostgreSQL schema for each ministry automatically
+# djangorestframework — lets us build the API that mobile app and other groups will use
+# djangorestframework-simplejwt — issues and verifies JWT tokens
+# mozilla-django-oidc — connects Django to Keycloak for SSO (Phase 5)
+# django-cors-headers — allows Flutter mobile app to call our API from a different origin
+# python-decouple — reads secrets from .env file so we never hardcode passwords in code
+# psycopg2-binary — Python driver that lets Django talk to PostgreSQL
+# Pillow — handles image uploads for assets
+# requests — lets Django call Keycloak Admin API to create users
+# pytest-django — for writing automated tests (Phase 10)

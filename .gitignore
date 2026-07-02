@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+
+# Virtual environment — never commit this
+venv/
+env/
+ENV/
+
+# Environment variables — NEVER commit .env
+.env
+.env.local
+.env.production
+*.env
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+staticfiles/
+media/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# pgAdmin
+*.pgpass
+
+# Test coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+
+# Logs
+logs/*.log
