@@ -15,7 +15,7 @@
 <div class="detail-grid">
 
     {# ── Summary Card ── #}
-    <div class="card detail-card">
+    <div class="card detail-card" style="padding:20px;">
         <div class="card-header">
             <h3>Action Summary</h3>
         </div>
@@ -67,7 +67,7 @@
 
     {# ── Before / After Card ── #}
     {% if changes %}
-    <div class="card detail-card">
+    <div class="card detail-card" style="padding:20px;">
         <div class="card-header">
             <h3>
                 {% if log.action == 'CREATE' %}
