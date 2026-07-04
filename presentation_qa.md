@@ -2000,6 +2000,24 @@ This is honest and shows understanding without lying.
 6. Show **Swagger API docs** (/api/docs/) — demonstrate the API
 7. Show **PostgreSQL** — run `\dn` to show schemas
 
+### Browser cache issue — CSS not loading (important!)
+
+**What happened to you:** Your browser saved (cached) the CSS file locally from a previous visit. Even after restarting your PC, the browser still used the SAVED CSS from its cache instead of fetching the fresh CSS from the server. This is why Ctrl+F5 (hard refresh) fixed it — it tells the browser to IGNORE the cache and download everything fresh.
+
+**Why restarting the PC didn't work:** The browser cache is stored on your hard drive. Restarting the PC does NOT clear the browser cache. Only clearing the cache or a hard refresh removes it.
+
+**How to fix it during a presentation (if CSS breaks):**
+1. **Quick fix:** Press **Ctrl+Shift+R** (Windows) or **Cmd+Shift+R** (Mac) on the page
+2. **Alternative:** Open your browser's Developer Tools (F12) → right-click the refresh button → "Empty Cache and Hard Reload"
+3. **Nuclear option:** Chrome → Settings → Privacy and security → Clear browsing data → Check "Cached images and files" → Clear data
+
+**Why this happens more with CSS than HTML:**
+- HTML pages are usually served with `no-cache` headers (always check for updates)
+- CSS files are often served with cache headers that say "keep this for days/weeks"
+- When you change the CSS, the browser doesn't know — it keeps using the old saved version
+
+**To prevent this in the future:** When you update the CSS file, you can also restart the Django server (Ctrl+C then `python manage.py runserver`). Django's development server automatically adds cache-busting headers in debug mode, which helps — but sometimes the browser's cache still wins.
+
 ---
 
 <a name="part-16"></a>
@@ -4090,6 +4108,7 @@ http://192.168.43.105:8000
 | Django says `ALLOWED_HOSTS` error | New IP not in settings.py | Run Step 4B |
 | Phone app shows old data after IP change | App not rebuilt | Reconnect USB and run `flutter run` again |
 | Keycloak page not loading | Still starting up | Wait 60 seconds, try again |
+| Web page has no styling / CSS broken | Browser cached old CSS | Press **Ctrl+Shift+R** (hard refresh) — or clear browser cache |
 
 ---
 
