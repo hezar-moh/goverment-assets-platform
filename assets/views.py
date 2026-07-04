@@ -9,7 +9,21 @@ from authentication.decorators import (
 )
 from .models import Asset, AssetCategory
 
-
+def _get_client_ip(request):
+    """
+    Extract the real client IP address from the request.
+    Checks X-Forwarded-For first (set by proxies/load balancers)
+    then falls back to REMOTE_ADDR (the direct connection IP).
+    """
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        # X-Forwarded-For can be a comma-separated list like:
+        # "203.0.113.5, 70.41.3.18, 150.172.238.178"
+        # The FIRST one is always the original client
+        ip = x_forwarded_for.split(',')[0].strip()
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
 
 def _load_asset_form_data(ministry_schema):
     """Load dropdown options for the asset form — categories, org units, master data lists."""
