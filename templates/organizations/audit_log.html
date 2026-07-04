@@ -18,7 +18,9 @@
 {% if is_super_admin %}
 <div class="card" style="padding:40px;text-align:center;">
   <i class="bi bi-info-circle" style="font-size:2rem;color:var(--info);display:block;margin-bottom:10px;"></i>
-  <p style="color:var(--text-secondary);">Audit logs are stored per ministry schema. Log in as a ministry user to view their audit trail.</p>
+  <p style="color:var(--text-secondary);">
+    Audit logs are stored per ministry schema. Log in as a ministry user to view their audit trail.
+  </p>
 </div>
 {% else %}
 
@@ -28,14 +30,15 @@
       <label>Filter by Action</label>
       <select name="action" class="form-select">
         <option value="">All Actions</option>
-        <option value="CREATE"       {% if action_filter == 'CREATE'       %}selected{% endif %}>Create</option>
-        <option value="UPDATE"       {% if action_filter == 'UPDATE'       %}selected{% endif %}>Update</option>
-        <option value="DELETE"       {% if action_filter == 'DELETE'       %}selected{% endif %}>Delete</option>
-        <option value="LOGIN"        {% if action_filter == 'LOGIN'        %}selected{% endif %}>Login</option>
-        <option value="LOGOUT"       {% if action_filter == 'LOGOUT'       %}selected{% endif %}>Logout</option>
-        <option value="ACCESS_DENIED"{% if action_filter == 'ACCESS_DENIED'%}selected{% endif %}>Access Denied</option>
+        <option value="CREATE" {% if action_filter == 'CREATE' %}selected{% endif %}>Create</option>
+        <option value="UPDATE" {% if action_filter == 'UPDATE' %}selected{% endif %}>Update</option>
+        <option value="DELETE" {% if action_filter == 'DELETE' %}selected{% endif %}>Delete</option>
+        <option value="LOGIN" {% if action_filter == 'LOGIN' %}selected{% endif %}>Login</option>
+        <option value="LOGOUT" {% if action_filter == 'LOGOUT' %}selected{% endif %}>Logout</option>
+        <option value="ACCESS_DENIED" {% if action_filter == 'ACCESS_DENIED' %}selected{% endif %}>Access Denied</option>
       </select>
     </div>
+
     <div style="display:flex;gap:8px;">
       <button type="submit" class="btn btn-primary btn-sm">
         <i class="bi bi-funnel-fill"></i> Filter
@@ -58,11 +61,17 @@
           <th>Description</th>
           <th>IP Address</th>
           <th>Timestamp</th>
+          <th>Action</th>
         </tr>
       </thead>
+
       <tbody>
         {% for log in logs %}
-        <tr>
+        <tr
+            onclick="window.location='{% url 'audit_log_detail' log.id %}'"
+            style="cursor: pointer;"
+            class="audit-row"
+        >
           <td>
             <span class="badge
               {% if log.action == 'CREATE' %}badge-create
@@ -82,28 +91,51 @@
               {{ log.action }}
             </span>
           </td>
+
           <td>
             <div class="user-cell">
               <div class="avatar avatar-blue" style="width:28px;height:28px;font-size:10px;">
                 {{ log.performed_by_name|slice:":2"|upper }}
               </div>
-              <span style="font-weight:600;font-size:13px;">{{ log.performed_by_name|default:"System" }}</span>
+              <span style="font-weight:600;font-size:13px;">
+                {{ log.performed_by_name|default:"System" }}
+              </span>
             </div>
           </td>
-          <td><code style="font-size:11.5px;">{{ log.model_name }}</code></td>
-          <td style="color:var(--text-secondary);max-width:280px;">
-            <span title="{{ log.object_repr }}">{{ log.object_repr|truncatechars:50 }}</span>
+
+          <td>
+            <code style="font-size:11.5px;">{{ log.model_name }}</code>
           </td>
+
+          <td style="color:var(--text-secondary);max-width:280px;">
+            <span title="{{ log.object_repr }}">
+              {{ log.object_repr|truncatechars:50 }}
+            </span>
+          </td>
+
           <td style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);">
             {{ log.ip_address|default:"—" }}
           </td>
+
           <td style="font-size:12.5px;color:var(--text-muted);white-space:nowrap;">
             {{ log.timestamp|date:"d M Y H:i:s" }}
           </td>
+
+          <!-- NEW: View button -->
+          <td>
+            <a
+              href="{% url 'audit_log_detail' log.id %}"
+              class="btn btn-outline btn-sm"
+              onclick="event.stopPropagation();"
+            >
+              View
+            </a>
+          </td>
         </tr>
+
         {% empty %}
         <tr>
-          <td colspan="6">
+          <td colspan="7">
             <div class="empty-state">
               <i class="bi bi-journal-x"></i>
               <p>No audit records found.</p>
@@ -112,11 +144,14 @@
         </tr>
         {% endfor %}
       </tbody>
+
     </table>
   </div>
+
   {% if page %}
   {% include 'shared/pagination.html' %}
   {% endif %}
 </div>
+
 {% endif %}
 {% endblock %}

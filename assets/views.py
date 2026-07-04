@@ -5,9 +5,12 @@ from django.contrib import messages
 from django_tenants.utils import schema_context
 
 from authentication.decorators import (
-    login_required_custom, role_required, ministry_isolation_check,
+    login_required_custom,
+    role_required,
+    ministry_isolation_check,
 )
 from .models import Asset, AssetCategory
+
 
 def _get_client_ip(request):
     """
@@ -15,26 +18,27 @@ def _get_client_ip(request):
     Checks X-Forwarded-For first (set by proxies/load balancers)
     then falls back to REMOTE_ADDR (the direct connection IP).
     """
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
     if x_forwarded_for:
         # X-Forwarded-For can be a comma-separated list like:
         # "203.0.113.5, 70.41.3.18, 150.172.238.178"
         # The FIRST one is always the original client
-        ip = x_forwarded_for.split(',')[0].strip()
+        ip = x_forwarded_for.split(",")[0].strip()
     else:
-        ip = request.META.get('REMOTE_ADDR')
+        ip = request.META.get("REMOTE_ADDR")
     return ip
+
 
 def _load_asset_form_data(ministry_schema):
     """Load dropdown options for the asset form — categories, org units, master data lists."""
     result = {
-        'categories':          [],
-        'org_units':           [],
-        'funding_sources':     [],
-        'acquisition_methods': [],
-        'location_types':      [],
-        'disposal_methods':    [],
-        'cost_centres':        [],
+        "categories": [],
+        "org_units": [],
+        "funding_sources": [],
+        "acquisition_methods": [],
+        "location_types": [],
+        "disposal_methods": [],
+        "cost_centres": [],
     }
 
     try:
@@ -42,52 +46,43 @@ def _load_asset_form_data(ministry_schema):
             from assets.models import AssetCategory
             from organizations.models import OrgUnit, MasterData
 
-            result['categories'] = list(
-                AssetCategory.objects.filter(
-                    is_active=True
-                ).order_by('name')
+            result["categories"] = list(
+                AssetCategory.objects.filter(is_active=True).order_by("name")
             )
-            result['org_units'] = list(
-                OrgUnit.objects.filter(
-                    unit_type='FACILITY',
-                    is_active=True
-                ).order_by('name')
+            result["org_units"] = list(
+                OrgUnit.objects.filter(unit_type="FACILITY", is_active=True).order_by(
+                    "name"
+                )
             )
-            result['funding_sources'] = list(
+            result["funding_sources"] = list(
                 MasterData.objects.filter(
-                    category='FUNDING_SOURCE',
-                    is_active=True
-                ).order_by('sort_order', 'label')
+                    category="FUNDING_SOURCE", is_active=True
+                ).order_by("sort_order", "label")
             )
-            result['acquisition_methods'] = list(
+            result["acquisition_methods"] = list(
                 MasterData.objects.filter(
-                    category='ACQUISITION_METHOD',
-                    is_active=True
-                ).order_by('sort_order', 'label')
+                    category="ACQUISITION_METHOD", is_active=True
+                ).order_by("sort_order", "label")
             )
-            result['location_types'] = list(
+            result["location_types"] = list(
                 MasterData.objects.filter(
-                    category='LOCATION_TYPE',
-                    is_active=True
-                ).order_by('sort_order', 'label')
+                    category="LOCATION_TYPE", is_active=True
+                ).order_by("sort_order", "label")
             )
-            result['disposal_methods'] = list(
+            result["disposal_methods"] = list(
                 MasterData.objects.filter(
-                    category='DISPOSAL_METHOD',
-                    is_active=True
-                ).order_by('sort_order', 'label')
+                    category="DISPOSAL_METHOD", is_active=True
+                ).order_by("sort_order", "label")
             )
-            result['cost_centres'] = list(
+            result["cost_centres"] = list(
                 MasterData.objects.filter(
-                    category='COST_CENTRE',
-                    is_active=True
-                ).order_by('sort_order', 'label')
+                    category="COST_CENTRE", is_active=True
+                ).order_by("sort_order", "label")
             )
     except Exception:
         pass
 
     return result
-
 
 
 def generate_asset_number(ministry_schema, category_code):
@@ -97,18 +92,20 @@ def generate_asset_number(ministry_schema, category_code):
     """
     from django.utils import timezone
 
-    year   = timezone.now().year
-    prefix = ministry_schema.replace('_schema', '').upper()[:3]
-    base   = f"{prefix}-{category_code}-{year}-"
+    year = timezone.now().year
+    prefix = ministry_schema.replace("_schema", "").upper()[:3]
+    base = f"{prefix}-{category_code}-{year}-"
 
     # Find the highest existing sequence number
-    existing = Asset.objects.filter(
-        asset_number__startswith=base
-    ).order_by('-asset_number').first()
+    existing = (
+        Asset.objects.filter(asset_number__startswith=base)
+        .order_by("-asset_number")
+        .first()
+    )
 
     if existing:
         try:
-            last_seq = int(existing.asset_number.split('-')[-1])
+            last_seq = int(existing.asset_number.split("-")[-1])
         except (ValueError, IndexError):
             last_seq = 0
     else:
@@ -119,11 +116,10 @@ def generate_asset_number(ministry_schema, category_code):
     sequence = last_seq + 1
     while True:
         asset_number = f"{base}{str(sequence).zfill(4)}"
-        if not Asset.objects.filter(
-            asset_number=asset_number
-        ).exists():
+        if not Asset.objects.filter(asset_number=asset_number).exists():
             return asset_number
         sequence += 1
+
 
 @login_required_custom
 @ministry_isolation_check
@@ -148,26 +144,25 @@ def asset_list_view(request):
 
     try:
         with schema_context(user.ministry_schema):
-            qs = Asset.objects.select_related('category').all()
+            qs = Asset.objects.select_related("category").all()
 
-            status_filter = request.GET.get('status', '')
+            status_filter = request.GET.get("status", "")
             if status_filter:
                 qs = qs.filter(status=status_filter)
 
-            category_filter = request.GET.get('category', '')
+            category_filter = request.GET.get("category", "")
             if category_filter:
                 qs = qs.filter(category_id=category_filter)
 
-            search = request.GET.get('search', '').strip()
+            search = request.GET.get("search", "").strip()
             if search:
-                qs = qs.filter(
-                    name__icontains=search
-                ) | qs.filter(
+                qs = qs.filter(name__icontains=search) | qs.filter(
                     asset_number__icontains=search
                 )
 
             # Paginate — 20 assets per page
             from authentication.pagination import paginate_queryset
+
             page, paginator = paginate_queryset(qs, request, per_page=20)
             assets = list(page.object_list)
             categories = list(AssetCategory.objects.filter(is_active=True))
@@ -175,52 +170,57 @@ def asset_list_view(request):
     except Exception as e:
         messages.error(request, f"Error loading assets: {str(e)}")
 
-    return render(request, 'assets/asset_list.html', {
-        'assets':          assets,
-        'categories':      categories,
-        'is_super_admin':  False,
-        'page_title':      'Asset Register',
-        'status_filter':   status_filter if 'status_filter' in locals() else '',
-        'category_filter': category_filter if 'category_filter' in locals() else '',
-        'search':          search if 'search' in locals() else '',
-        'can_edit':        user.role in ['MINISTRY_ADMIN', 'AGENCY_MANAGER', 'FACILITY_CLERK'],
-        'STATUS_CHOICES':  Asset.STATUS_CHOICES,
-        'page':            page if 'page' in locals() else None,
-        'paginator':       paginator if 'paginator' in locals() else None,
-    })
+    return render(
+        request,
+        "assets/asset_list.html",
+        {
+            "assets": assets,
+            "categories": categories,
+            "is_super_admin": False,
+            "page_title": "Asset Register",
+            "status_filter": status_filter if "status_filter" in locals() else "",
+            "category_filter": category_filter if "category_filter" in locals() else "",
+            "search": search if "search" in locals() else "",
+            "can_edit": user.role
+            in ["MINISTRY_ADMIN", "AGENCY_MANAGER", "FACILITY_CLERK"],
+            "STATUS_CHOICES": Asset.STATUS_CHOICES,
+            "page": page if "page" in locals() else None,
+            "paginator": paginator if "paginator" in locals() else None,
+        },
+    )
 
 
 @login_required_custom
-@role_required('MINISTRY_ADMIN', 'AGENCY_MANAGER', 'FACILITY_CLERK')
+@role_required("MINISTRY_ADMIN", "AGENCY_MANAGER", "FACILITY_CLERK")
 def asset_create_view(request):
     """Show the create form on GET. Validate and save on POST, then redirect to the detail page."""
     user = request.user
     form_data = _load_asset_form_data(user.ministry_schema)
 
-    if request.method == 'POST':
-        asset_number       = request.POST.get('asset_number', '').strip()
-        name               = request.POST.get('name', '').strip()
-        category_id        = request.POST.get('category', '')
-        serial_number      = request.POST.get('serial_number', '').strip()
-        manufacturer       = request.POST.get('manufacturer', '').strip()
-        model_number       = request.POST.get('model_number', '').strip()
-        supplier_name      = request.POST.get('supplier_name', '').strip()
-        po_number          = request.POST.get('purchase_order_number', '').strip()
-        status             = request.POST.get('status', 'ACTIVE')
-        condition          = request.POST.get('condition', 'GOOD')
-        location_desc      = request.POST.get('location_description', '').strip()
-        location_type      = request.POST.get('location_type', '').strip()
-        org_unit_id        = request.POST.get('org_unit_id', '') or None
-        useful_life        = request.POST.get('useful_life_years', '') or None
-        acquisition_date   = request.POST.get('acquisition_date') or None
-        warranty_expiry    = request.POST.get('warranty_expiry_date') or None
-        asset_expiry       = request.POST.get('asset_expiry_date') or None
-        acquisition_cost   = request.POST.get('acquisition_cost') or None
-        current_value      = request.POST.get('current_value') or None
-        funding_source     = request.POST.get('funding_source', '').strip()
-        acquisition_method = request.POST.get('acquisition_method', '').strip()
-        cost_centre        = request.POST.get('cost_centre', '').strip()
-        description        = request.POST.get('description', '').strip()
+    if request.method == "POST":
+        asset_number = request.POST.get("asset_number", "").strip()
+        name = request.POST.get("name", "").strip()
+        category_id = request.POST.get("category", "")
+        serial_number = request.POST.get("serial_number", "").strip()
+        manufacturer = request.POST.get("manufacturer", "").strip()
+        model_number = request.POST.get("model_number", "").strip()
+        supplier_name = request.POST.get("supplier_name", "").strip()
+        po_number = request.POST.get("purchase_order_number", "").strip()
+        status = request.POST.get("status", "ACTIVE")
+        condition = request.POST.get("condition", "GOOD")
+        location_desc = request.POST.get("location_description", "").strip()
+        location_type = request.POST.get("location_type", "").strip()
+        org_unit_id = request.POST.get("org_unit_id", "") or None
+        useful_life = request.POST.get("useful_life_years", "") or None
+        acquisition_date = request.POST.get("acquisition_date") or None
+        warranty_expiry = request.POST.get("warranty_expiry_date") or None
+        asset_expiry = request.POST.get("asset_expiry_date") or None
+        acquisition_cost = request.POST.get("acquisition_cost") or None
+        current_value = request.POST.get("current_value") or None
+        funding_source = request.POST.get("funding_source", "").strip()
+        acquisition_method = request.POST.get("acquisition_method", "").strip()
+        cost_centre = request.POST.get("cost_centre", "").strip()
+        description = request.POST.get("description", "").strip()
 
         errors = []
         if not name:
@@ -231,14 +231,18 @@ def asset_create_view(request):
         if errors:
             for error in errors:
                 messages.error(request, error)
-            return render(request, 'assets/asset_form.html', {
-                'asset': None,
-                'page_title': 'Register New Asset',
-                'STATUS_CHOICES': Asset.STATUS_CHOICES,
-                'CONDITION_CHOICES': Asset.CONDITION_CHOICES,
-                'form_data': request.POST,
-                **form_data,
-            })
+            return render(
+                request,
+                "assets/asset_form.html",
+                {
+                    "asset": None,
+                    "page_title": "Register New Asset",
+                    "STATUS_CHOICES": Asset.STATUS_CHOICES,
+                    "CONDITION_CHOICES": Asset.CONDITION_CHOICES,
+                    "form_data": request.POST,
+                    **form_data,
+                },
+            )
 
         try:
             with schema_context(user.ministry_schema):
@@ -251,23 +255,27 @@ def asset_create_view(request):
 
                 if Asset.objects.filter(asset_number=asset_number).exists():
                     messages.error(
-                        request,
-                        f"Asset number '{asset_number}' already exists."
+                        request, f"Asset number '{asset_number}' already exists."
                     )
-                    return render(request, 'assets/asset_form.html', {
-                        'asset': None,
-                        'page_title': 'Register New Asset',
-                        'STATUS_CHOICES': Asset.STATUS_CHOICES,
-                        'CONDITION_CHOICES': Asset.CONDITION_CHOICES,
-                        'form_data': request.POST,
-                        **form_data,
-                    })
+                    return render(
+                        request,
+                        "assets/asset_form.html",
+                        {
+                            "asset": None,
+                            "page_title": "Register New Asset",
+                            "STATUS_CHOICES": Asset.STATUS_CHOICES,
+                            "CONDITION_CHOICES": Asset.CONDITION_CHOICES,
+                            "form_data": request.POST,
+                            **form_data,
+                        },
+                    )
 
-                org_unit_name = ''
+                org_unit_name = ""
                 if org_unit_id:
                     from organizations.models import OrgUnit
+
                     try:
-                        org_unit_obj  = OrgUnit.objects.get(id=org_unit_id)
+                        org_unit_obj = OrgUnit.objects.get(id=org_unit_id)
                         org_unit_name = org_unit_obj.name
                     except OrgUnit.DoesNotExist:
                         org_unit_id = None
@@ -304,28 +312,33 @@ def asset_create_view(request):
                 _log_asset_action(
                     schema_name=user.ministry_schema,
                     user=user,
-                    action='CREATE',
+                    action="CREATE",
                     asset=asset,
                     old_value=None,
+                    request=request,
                 )
 
             messages.success(
-                request,
-                f"Asset '{name}' registered with number {asset_number}."
+                request, f"Asset '{name}' registered with number {asset_number}."
             )
-            return redirect('asset_detail', asset_id=asset.id)
+            return redirect("asset_detail", asset_id=asset.id)
 
         except Exception as e:
             messages.error(request, f"Error creating asset: {str(e)}")
 
-    return render(request, 'assets/asset_form.html', {
-        'asset': None,
-        'page_title': 'Register New Asset',
-        'STATUS_CHOICES': Asset.STATUS_CHOICES,
-        'CONDITION_CHOICES': Asset.CONDITION_CHOICES,
-        'form_data': {},
-        **form_data,
-    })
+    return render(
+        request,
+        "assets/asset_form.html",
+        {
+            "asset": None,
+            "page_title": "Register New Asset",
+            "STATUS_CHOICES": Asset.STATUS_CHOICES,
+            "CONDITION_CHOICES": Asset.CONDITION_CHOICES,
+            "form_data": {},
+            **form_data,
+        },
+    )
+
 
 @login_required_custom
 @ministry_isolation_check
@@ -366,7 +379,7 @@ def asset_detail_view(request, asset_id):
 
 
 @login_required_custom
-@role_required('MINISTRY_ADMIN', 'AGENCY_MANAGER', 'FACILITY_CLERK')
+@role_required("MINISTRY_ADMIN", "AGENCY_MANAGER", "FACILITY_CLERK")
 def asset_edit_view(request, asset_id):
     """Edit an existing asset. Captures old values before changes for the audit trail."""
     user = request.user
@@ -378,73 +391,100 @@ def asset_edit_view(request, asset_id):
     asset = None
     try:
         with schema_context(user.ministry_schema):
-            asset = Asset.objects.select_related('category').get(id=asset_id)
+            asset = Asset.objects.select_related("category").get(id=asset_id)
     except Asset.DoesNotExist:
         messages.error(request, "Asset not found.")
-        return redirect('asset_list')
+        return redirect("asset_list")
     except Exception as e:
         messages.error(request, f"Error loading asset: {str(e)}")
-        return redirect('asset_list')
+        return redirect("asset_list")
 
-    if request.method == 'POST':
+    if request.method == "POST":
         try:
             with schema_context(user.ministry_schema):
-                asset = Asset.objects.select_related('category').get(id=asset_id)
+                asset = Asset.objects.select_related("category").get(id=asset_id)
 
                 old_value = {
-                    'name':               asset.name,
-                    'status':             asset.status,
-                    'condition':          asset.condition,
-                    'manufacturer':       asset.manufacturer,
-                    'location_description': asset.location_description,
-                    'acquisition_cost':   str(asset.acquisition_cost or ''),
-                    'current_value':      str(asset.current_value or ''),
-                    'asset_expiry_date':  str(asset.asset_expiry_date or ''),
+                    "name": asset.name,
+                    "status": asset.status,
+                    "condition": asset.condition,
+                    "manufacturer": asset.manufacturer,
+                    "location_description": asset.location_description,
+                    "acquisition_cost": str(asset.acquisition_cost or ""),
+                    "current_value": str(asset.current_value or ""),
+                    "asset_expiry_date": str(asset.asset_expiry_date or ""),
                 }
 
-                asset.name               = request.POST.get('name', asset.name).strip()
-                asset.status             = request.POST.get('status', asset.status)
-                asset.condition          = request.POST.get('condition', asset.condition)
-                asset.manufacturer       = request.POST.get('manufacturer', asset.manufacturer).strip()
-                asset.model_number       = request.POST.get('model_number', asset.model_number).strip()
-                asset.supplier_name      = request.POST.get('supplier_name', asset.supplier_name).strip()
-                asset.purchase_order_number = request.POST.get('purchase_order_number', asset.purchase_order_number).strip()
-                asset.location_description  = request.POST.get('location_description', asset.location_description).strip()
-                asset.funding_source     = request.POST.get('funding_source', asset.funding_source).strip()
-                asset.acquisition_method = request.POST.get('acquisition_method', asset.acquisition_method).strip()
-                asset.cost_centre        = request.POST.get('cost_centre', asset.cost_centre).strip()
-                asset.location_type      = request.POST.get('location_type', asset.location_type).strip()
-                asset.description        = request.POST.get('description', asset.description).strip()
+                asset.name = request.POST.get("name", asset.name).strip()
+                asset.status = request.POST.get("status", asset.status)
+                asset.condition = request.POST.get("condition", asset.condition)
+                asset.manufacturer = request.POST.get(
+                    "manufacturer", asset.manufacturer
+                ).strip()
+                asset.model_number = request.POST.get(
+                    "model_number", asset.model_number
+                ).strip()
+                asset.supplier_name = request.POST.get(
+                    "supplier_name", asset.supplier_name
+                ).strip()
+                asset.purchase_order_number = request.POST.get(
+                    "purchase_order_number", asset.purchase_order_number
+                ).strip()
+                asset.location_description = request.POST.get(
+                    "location_description", asset.location_description
+                ).strip()
+                asset.funding_source = request.POST.get(
+                    "funding_source", asset.funding_source
+                ).strip()
+                asset.acquisition_method = request.POST.get(
+                    "acquisition_method", asset.acquisition_method
+                ).strip()
+                asset.cost_centre = request.POST.get(
+                    "cost_centre", asset.cost_centre
+                ).strip()
+                asset.location_type = request.POST.get(
+                    "location_type", asset.location_type
+                ).strip()
+                asset.description = request.POST.get(
+                    "description", asset.description
+                ).strip()
 
                 # Disposal fields — only saved when status is DISPOSED
-                if request.POST.get('status') == 'DISPOSED':
-                    asset.disposal_method = request.POST.get('disposal_method', '').strip()
-                    asset.disposal_date   = request.POST.get('disposal_date') or None
-                    asset.disposal_notes  = request.POST.get('disposal_notes', '').strip()
-                asset.useful_life_years  = request.POST.get('useful_life_years') or None
+                if request.POST.get("status") == "DISPOSED":
+                    asset.disposal_method = request.POST.get(
+                        "disposal_method", ""
+                    ).strip()
+                    asset.disposal_date = request.POST.get("disposal_date") or None
+                    asset.disposal_notes = request.POST.get(
+                        "disposal_notes", ""
+                    ).strip()
+                asset.useful_life_years = request.POST.get("useful_life_years") or None
 
-                asset.acquisition_date      = request.POST.get('acquisition_date') or None
-                asset.warranty_expiry_date  = request.POST.get('warranty_expiry_date') or None
-                asset.asset_expiry_date     = request.POST.get('asset_expiry_date') or None
+                asset.acquisition_date = request.POST.get("acquisition_date") or None
+                asset.warranty_expiry_date = (
+                    request.POST.get("warranty_expiry_date") or None
+                )
+                asset.asset_expiry_date = request.POST.get("asset_expiry_date") or None
 
-                cost = request.POST.get('acquisition_cost')
+                cost = request.POST.get("acquisition_cost")
                 if cost:
                     asset.acquisition_cost = cost
 
-                value = request.POST.get('current_value')
+                value = request.POST.get("current_value")
                 if value:
                     asset.current_value = value
 
-                category_id = request.POST.get('category')
+                category_id = request.POST.get("category")
                 if category_id:
                     asset.category = AssetCategory.objects.get(id=category_id)
 
-                org_unit_id = request.POST.get('org_unit_id') or None
+                org_unit_id = request.POST.get("org_unit_id") or None
                 if org_unit_id:
                     from organizations.models import OrgUnit
+
                     try:
-                        org_unit_obj       = OrgUnit.objects.get(id=org_unit_id)
-                        asset.org_unit_id  = org_unit_obj.id
+                        org_unit_obj = OrgUnit.objects.get(id=org_unit_id)
+                        asset.org_unit_id = org_unit_obj.id
                         asset.org_unit_name = org_unit_obj.name
                     except OrgUnit.DoesNotExist:
                         pass
@@ -454,25 +494,31 @@ def asset_edit_view(request, asset_id):
                 _log_asset_action(
                     schema_name=user.ministry_schema,
                     user=user,
-                    action='UPDATE',
+                    action="UPDATE",
                     asset=asset,
                     old_value=old_value,
+                    request=request,
                 )
 
             messages.success(request, f"Asset '{asset.name}' updated successfully.")
-            return redirect('asset_detail', asset_id=asset.id)
+            return redirect("asset_detail", asset_id=asset.id)
 
         except Exception as e:
             messages.error(request, f"Error updating asset: {str(e)}")
 
-    return render(request, 'assets/asset_form.html', {
-        'asset': asset,
-        'page_title': f'Edit: {asset.asset_number}',
-        'STATUS_CHOICES': Asset.STATUS_CHOICES,
-        'CONDITION_CHOICES': Asset.CONDITION_CHOICES,
-        'is_edit': True,
-        **form_data,
-    })
+    return render(
+        request,
+        "assets/asset_form.html",
+        {
+            "asset": asset,
+            "page_title": f"Edit: {asset.asset_number}",
+            "STATUS_CHOICES": Asset.STATUS_CHOICES,
+            "CONDITION_CHOICES": Asset.CONDITION_CHOICES,
+            "is_edit": True,
+            **form_data,
+        },
+    )
+
 
 @login_required_custom
 @role_required("MINISTRY_ADMIN")
@@ -498,6 +544,7 @@ def asset_delete_view(request, asset_id):
                         "name": asset_name,
                         "status": asset.status,
                     },
+                    request=request,  
                 )
 
                 asset.delete()
@@ -512,8 +559,13 @@ def asset_delete_view(request, asset_id):
     return redirect("asset_list")
 
 
-def _log_asset_action(schema_name, user, action, asset, old_value):
-    """Write an audit log entry for asset create/update/delete. Shared by all views so the logic stays in one place."""
+def _log_asset_action(schema_name, user, action, asset, old_value, request=None):
+    """
+    Write an audit log entry for asset create/update/delete. Shared by all views so the logic stays in one place.
+
+    The 'request' parameter is optional so old call sites don't break
+    immediately, but should always be passed so the IP address is captured.
+    """
     try:
         from organizations.models import AuditLog
 
@@ -526,6 +578,13 @@ def _log_asset_action(schema_name, user, action, asset, old_value):
                 "condition": asset.condition,
             }
 
+        # Extract IP and user agent from the request if available
+        ip_address = None
+        user_agent = ""
+        if request is not None:
+            ip_address = _get_client_ip(request)
+            user_agent = request.META.get("HTTP_USER_AGENT", "")[:500]
+
         with schema_context(schema_name):
             AuditLog.objects.create(
                 performed_by_id=user.id,
@@ -536,6 +595,8 @@ def _log_asset_action(schema_name, user, action, asset, old_value):
                 object_repr=str(asset),
                 old_value=old_value,
                 new_value=new_value,
+                ip_address=ip_address,  # ← NOW captured
+                user_agent=user_agent,  # ← NOW captured
             )
     except Exception:
         # Never block the main action because audit logging failed

@@ -15,8 +15,8 @@
 | 4 | [Keycloak SSO Flow](#part-4) | The 14-step login flow + Keycloak purpose + Django vs Keycloak relationship |
 | 5 | [Keycloak vs SimpleJWT](#part-5) | When each is used, why mobile doesn't use Keycloak, why web doesn't use JWT |
 | 6 | [0.0.0.0:8000 Explained](#part-6) | Why we use it, what happens if we don't |
-| 7 | [All Code Components](#part-7) | Decorators, serializers, middleware, permissions, exception handler, pagination explained |
-| 8 | [Security Features](#part-8) | All 13 security features with file/line evidence |
+| 7 | [All Code Components](#part-7) | Decorators, serializers, middleware, permissions, exception handler, pagination, helper functions explained |
+| 8 | [Security Features](#part-8) | All 15 security features + IP capture in audit logs, IntegerField vs ForeignKey explained |
 | 9 | [Database Design](#part-9) | Public schema vs tenant schemas, why not one big table |
 | 10 | [Other Technologies](#part-10) | DRF, CORS, mozilla-django-oidc, drf-yasg, SimpleJWT, decouple, etc. |
 | 11 | [Deployment to Cloud](#part-11) | What you need for production, do you use 0.0.0.0? |
@@ -30,7 +30,7 @@
 | 19 | [Remember This for the Panel](#part-19) | Key sentences to memorize |
 | 20 | [CSS Quick Reference](#part-20) | How to change colors, text size, backgrounds — inline CSS & Bootstrap Icons |
 | 21 | [Database Deep Dive](#part-21) | All tables, columns, why shared vs private schemas, why PostgreSQL auto-starts |
-| 22 | [Making the System Live](#part-22) | Production setup, domains, code changes, how other groups access in production |
+| 22 | [Making the System Live](#part-22) | Production setup, domains, code changes, NGINX proxy, load balancers, X-Forwarded-For IP headers explained |
 | 23 | [Dev Setup: Web + Mobile](#part-23) | How two developers work together, same WiFi, different laptops |
 | 24 | [Complete File-by-File Explanation](#part-24) | Every folder and every `.py` file explained, with key classes and code evidence |
 | 25 | [Important Commands & Setup Reference](#part-25) | Full step-by-step: PostgreSQL, find IP, start Keycloak, start Django, connect phone, register domain, Flutter rebuild, demo data, troubleshooting, test accounts |
@@ -691,6 +691,27 @@ python manage.py runserver 0.0.0.0:8000
 - `127.0.0.1` = a phone that only calls itself
 - `0.0.0.0` = a phone that can receive calls from anyone
 
+### Why 127.0.0.1? — What it means when you see it
+
+When you open your browser on your laptop and go to `http://localhost:8000`, the request NEVER leaves your machine. It travels from one program (your browser) to another program (Django) entirely inside the same computer, through what is called a **loopback interface**.
+
+Every computer in the world reserves the address `127.0.0.1` to mean **"myself."** It is not a real network address — it is a shortcut that means "stay inside this machine."
+
+So when Django reads `request.META['REMOTE_ADDR']` and the browser is on the same laptop, the answer is always `127.0.0.1` — because the request came from the machine itself.
+
+When your phone sends a request over the hotspot, the request travels through a real network — from your phone's WiFi radio, through the hotspot signal, to your laptop's WiFi adapter. At that point `REMOTE_ADDR` is a real network address like `192.168.43.118` — your phone's actual address on that small private network.
+
+**The rule — Who sees what IP:**
+
+| Who sent the request | What IP you see in request.META |
+|---|---|
+| Browser on the same laptop as Django | `127.0.0.1` (loopback — never leaves the machine) |
+| Phone over hotspot | `192.168.43.x` (phone's real network address) |
+| Another laptop on the same WiFi | That laptop's IP |
+| Real internet user (in production) | Their real public IP |
+
+**Why this matters for security:** In a real government deployment, every audit log entry would show the real public IP of whoever performed the action. Investigators can trace a public IP back to a physical location or an organization if needed. During development, you see `127.0.0.1` which is correct — the request is from your own machine.
+
 ### Do you need 0.0.0.0 in production (cloud)?
 
 **NO.** In production, you use a proper web server like Nginx or Apache. The server listens on `0.0.0.0:80` (that's what web servers do by default). Django sits behind the web server and only listens on localhost (127.0.0.1:8000) — the web server forwards requests to it.
@@ -921,6 +942,112 @@ class AssetListCreateAPIView(APIView):
     ]
 ```
 
+### What are HELPER FUNCTIONS?
+
+**The most important thing to know:** A helper function is NOT a special kind of function. It is just a normal Python function. Python treats it exactly the same as any other function. The name "helper" only describes its **purpose** — it helps other parts of your code do their job.
+
+**So what makes a function a "helper"?**
+
+A helper function is a small function that does ONE small, reusable job. Think of it as a **tool** you keep in your toolbox and grab whenever you need it.
+
+| | Main function | Helper function |
+|---|---|---|
+| **Job** | Does the main task (e.g., login a user, create an asset) | Does a small supporting task (e.g., get the user's IP) |
+| **Size** | Can be 20-100+ lines | Usually 3-15 lines |
+| **Used by** | The browser/API calls it directly | Other functions call it |
+| **Reused?** | Usually called once per URL | Called from many places |
+
+**Analogy:**
+- Main function = a chef cooking a full meal
+- Helper function = a knife that the chef uses to chop, slice, and dice across many meals
+
+**The rule — When to create a helper function:**
+
+If you write the **same code more than once** in different places, and that code performs **one clear task**, make it a helper function.
+
+For example, instead of writing this in 3 different views:
+
+```python
+x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+if x_forwarded_for:
+    ip = x_forwarded_for.split(",")[0].strip()
+else:
+    ip = request.META.get("REMOTE_ADDR")
+```
+
+You write it ONCE as a helper and call it from everywhere:
+
+```python
+ip = _get_client_ip(request)  # One line — clean!
+```
+
+**Why does this matter?** If you later need to change how the IP is determined (e.g., add support for a new header), you update ONE function instead of searching through many files. This is called **Don't Repeat Yourself (DRY)** — a core principle of good code.
+
+**Where is `request.META['REMOTE_ADDR']` in our project?**
+
+The answer is: **It's not in our project.** It is provided by **Django** automatically.
+
+When a browser sends a request, Django creates an `HttpRequest` object for you:
+
+```python
+def my_view(request):    # ← Django CREATES this 'request' object
+    print(request)       #    You never created it yourself
+```
+
+Inside that object, Django stores a dictionary called `META` containing everything about the request — the sender's IP, what browser they used, what domain they visited, etc. Your code just reads from it:
+
+```python
+request.META['REMOTE_ADDR']    # Returns: "192.168.1.100"
+```
+
+You never create `request.META` — Django does it for you automatically on every request.
+
+**Example in our code — `_get_client_ip()`:**
+
+```python
+def _get_client_ip(request):
+    """Get the real IP address of the user making the request."""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0].strip()
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+```
+
+**Why make this a helper function?** Because 3 different places need the user's IP:
+1. The audit log (records who did what from what IP)
+2. The brute force lockout (counts failed logins per IP)
+3. The dashboard (shows login history)
+
+Without a helper, you write the same 6 lines in 3 places. With a helper, you write it ONCE and call it.
+
+**Why does it start with an underscore `_`?**
+
+The underscore is a Python **convention** (not a rule enforced by Python). It tells other programmers:
+
+> "This function is for internal use only. Don't use it outside this file unless you have a good reason."
+
+Python does NOT stop you from calling `_get_client_ip(request)` from anywhere. The underscore is just a polite warning to other developers.
+
+**How to spot a helper function in code:**
+- It has a descriptive name like `_get_client_ip`, `paginate_queryset`, `format_date`
+- It is usually small (3-15 lines)
+- It does ONE thing and does it well
+- It often starts with underscore `_` (internal use convention)
+- It is defined near the top of a file, right after the imports
+
+**Another example in our code — `paginate_queryset()`:**
+
+```python
+def paginate_queryset(queryset, request, per_page=20):
+    paginator = Paginator(queryset, per_page)
+    page = paginator.page(request.GET.get('page', 1))
+    return page, paginator
+```
+
+Every view that shows a list (assets, users, audit logs) calls this instead of writing pagination logic from scratch. That's the whole point of a helper — write once, use everywhere.
+
 ---
 
 <a name="part-8"></a>
@@ -947,6 +1074,98 @@ If someone tries to login 5 times with wrong password, they are locked out for 1
 ### 5. Tamper-proof audit log
 Once an audit record is created, it cannot be edited or deleted. This is enforced by overridden `save()` and `delete()` methods.
 - **Evidence:** `organizations/models.py` — lines 180-192
+
+**Every audit record captures the user's IP address.** This is how we know not just WHO did something, but FROM WHERE.
+
+When a user performs an action (create asset, edit user, delete record), the view captures the IP:
+
+```python
+# Inside every view that creates an audit log:
+ip = _get_client_ip(request)  # ← Helper function (explained in Part 7)
+AuditLog.objects.create(
+    performed_by=request.user,
+    action='CREATE',
+    model_name='Asset',
+    object_id=asset.id,
+    ip_address=ip,             # ← User's real IP is saved here
+    ...
+)
+```
+
+**How does Django know the user's IP?** You might think "where is `request.META['REMOTE_ADDR']` defined in our code?" The answer is: **nowhere.** Django provides it automatically.
+
+When a browser sends a request to your website, the operating system and web server know who connected and from what IP address. Django takes that information and places it inside `request.META` — a dictionary that contains everything about the incoming request:
+
+```python
+request.META == {
+    "REMOTE_ADDR": "192.168.1.100",      # ← The user's IP (Django adds this)
+    "HTTP_HOST": "moh.localhost:8000",    # ← The domain they visited
+    "HTTP_USER_AGENT": "Mozilla/5.0...",  # ← Their browser type
+    "REQUEST_METHOD": "GET",              # ← GET, POST, etc.
+    ...
+}
+```
+
+You never create this dictionary. Django creates it for you automatically on every single request. Your code only needs to READ from it:
+
+```python
+request.META['REMOTE_ADDR']    # Returns: "192.168.1.100" (the user's IP)
+```
+
+**Important — proxy awareness:** When your site is behind a proxy (like Nginx or Cloudflare), `REMOTE_ADDR` shows the proxy's IP, not the user's. The real user IP is in a header called `HTTP_X_FORWARDED_FOR`. Our `_get_client_ip()` helper checks this header first, then falls back to `REMOTE_ADDR`. This ensures the audit log always captures the real user's IP whether or not a proxy is present. (See Part 22 for a full explanation of proxies.)
+
+**Why does audit log use numbers for user IDs (looks like numbers)?**
+
+You will notice the audit log stores `performed_by_id` as a number, not a name:
+
+```python
+# organizations/models.py
+performed_by_id = models.IntegerField()  # ← Just a number, not a ForeignKey
+```
+
+This is NOT a mistake. It is a deliberate security design:
+
+| Why not store the name? | Because... |
+|---|---|
+| Names can change | User "John" might change their name to "Jonathan". The audit log would show the wrong name |
+| Users can be deleted | If a user is deleted, a ForeignKey would break. An IntegerField never breaks — the number stays forever |
+| PostgreSQL limitation | Foreign keys cannot point to tables in DIFFERENT schemas. Users are in `public` schema, audit records are in each ministry's schema |
+| Integrity | The number `5` will always mean "user with ID 5" — even if that user is later deleted, the record still shows who did it |
+
+**Think of it like a prison ID number:** The inmate's name might change (new surname), but their ID number never changes. The audit log uses the ID number because it is permanent.
+
+**What if you need to know the name?** You can look it up:
+
+```python
+from authentication.models import CustomUser
+user = CustomUser.objects.get(id=5)  # The "5" from the audit log
+print(user.get_full_name())          # Returns: "Amina Hassan"
+```
+
+**Code evidence for tamper-proof design:**
+
+```python
+# organizations/models.py
+class AuditLog(models.Model):
+    performed_by_id = models.IntegerField()     # User ID (never changes)
+    performed_by_name = models.CharField()      # Name at time of action (snapshot)
+    action = models.CharField()                 # CREATE, UPDATE, DELETE
+    model_name = models.CharField()             # Which model was changed
+    object_id = models.CharField()              # Which record was changed
+    object_repr = models.CharField()            # Human-readable description
+    old_value = models.JSONField(null=True)     # Before values (for updates)
+    new_value = models.JSONField(null=True)     # After values (for creates/updates)
+    ip_address = models.GenericIPAddressField() # User's IP at time of action
+    timestamp = models.DateTimeField(auto_now_add=True)  # When it happened
+    
+    def save(self, *args, **kwargs):
+        raise PermissionError("Audit log is read-only!")  # ← Cannot edit
+        
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Audit log cannot be deleted!")  # ← Cannot delete
+```
+
+The `save()` and `delete()` methods are overridden to RAISE AN ERROR if anyone tries to modify or delete an audit record. This includes the Super Admin — NO ONE can change the audit log.
 
 ### 6. Session security
 Session cookie expires when browser closes, cannot be read by JavaScript, and only sent over HTTPS in production.
@@ -2717,6 +2936,106 @@ def get_tenant_from_request(request):
 # 4. Runs: connection.set_schema("moh_schema")
 # 5. Now ALL queries use: SET search_path TO moh_schema, public;
 ```
+
+### Proxies and load balancers — What they are and why they matter
+
+**What is a proxy?**
+
+A proxy is a server that sits BETWEEN the user and your Django application. Instead of the user talking directly to Django, the user talks to the proxy first, and the proxy forwards the request to Django.
+
+```
+User (203.0.113.5)
+    │
+    ▼
+Proxy (198.51.100.10)   ← The proxy receives the request
+    │
+    ▼
+Django Server            ← The proxy forwards it to Django
+```
+
+**Why use a proxy?**
+- **Security** — Hides your Django server from the public internet
+- **HTTPS** — Handles SSL certificates (the padlock in the browser)
+- **Caching** — Saves copies of pages to make the site faster
+- **Load balancing** — Spreads traffic across multiple Django servers
+
+**What is a load balancer?**
+
+Imagine your website becomes very popular. Instead of one Django server, you have three. A load balancer decides which server handles each request:
+
+```
+              ┌────────────► Django Server 1
+User          │
+  │           ├────────────► Django Server 2
+  ▼           │
+Load Balancer └────────────► Django Server 3
+```
+
+If 3,000 people visit at the same time, one server would be overloaded. Three servers share the work. The load balancer spreads requests among them.
+
+**The IP address problem (important!)**
+
+Without a proxy, Django sees the user's real IP:
+
+```
+User (203.0.113.5) ────► Django
+REMOTE_ADDR = "203.0.113.5"  ✓ Correct!
+```
+
+With a proxy, Django sees the PROXY's IP, not the user's:
+
+```
+User (203.0.113.5) ────► Proxy (198.51.100.10) ────► Django
+REMOTE_ADDR = "198.51.100.10"  ✗ Wrong — that's the proxy!
+```
+
+**Why does the proxy change the IP?** The proxy doesn't "change" anything. It creates a NEW connection to Django. From Django's point of view, the proxy IS the client. Django can only see the computer that connected directly to it.
+
+**Analogy:** You call a pizza shop. Without a proxy, you call directly — the shop sees YOUR number. With a proxy, you call your friend, and your friend calls the shop for you. The shop sees YOUR FRIEND'S number because your friend is the one making the call.
+
+**The solution — X-Forwarded-For header**
+
+To solve this, the proxy adds a special header called `X-Forwarded-For` that contains the ORIGINAL user's IP:
+
+```
+User (203.0.113.5) ────► Proxy ────► Django
+                                       Header: X-Forwarded-For: 203.0.113.5
+```
+
+Django can then read:
+
+```python
+request.META['HTTP_X_FORWARDED_FOR']  # Returns: "203.0.113.5" (real user)
+request.META['REMOTE_ADDR']            # Returns: "198.51.100.10" (proxy's IP)
+```
+
+**Our helper function handles both scenarios:**
+
+```python
+def _get_client_ip(request):
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        # Proxy is present — use the FIRST IP in the list
+        ip = x_forwarded_for.split(',')[0].strip()
+    else:
+        # No proxy — use the direct connection IP
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+```
+
+**Do we have a proxy NOW (in development)?**
+
+No. During development with `python manage.py runserver`, there is no proxy. The helper function checks for `HTTP_X_FORWARDED_FOR`, doesn't find it, and simply returns `REMOTE_ADDR` (which is correct).
+
+**Why write this now?** You are preparing for production where a proxy like Nginx or Cloudflare is very common. By writing this helper now, your code works correctly in BOTH situations:
+
+```
+DEVELOPMENT (no proxy):      PRODUCTION (with proxy):
+  REMOTE_ADDR is correct       X-Forwarded-For has real IP
+  returned as-is               helper reads it automatically
+```
+
+Your audit log, brute-force protection, and any security features that rely on IP addresses will work correctly without changes when you deploy.
 
 ---
 

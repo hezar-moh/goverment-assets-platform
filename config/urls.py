@@ -29,6 +29,7 @@ from assets.views import (
     asset_delete_view,
 )
 from organizations.views import (
+    audit_log_detail_view,
     audit_log_view,
     org_unit_list_view,
     org_unit_create_view,
@@ -111,12 +112,14 @@ urlpatterns = [
 
     # Audit logs
     path('audit-logs/', audit_log_view, name='audit_log'),
+    path('audit-log/<int:log_id>/', audit_log_detail_view, name='audit_log_detail'),
 
     # Organisation
     path('organisation/',                      org_unit_list_view,   name='org_unit_list'),
     path('organisation/create/',               org_unit_create_view, name='org_unit_create'),
     path('organisation/<int:unit_id>/edit/',   org_unit_edit_view,   name='org_unit_edit'),
     path('organisation/<int:unit_id>/delete/', org_unit_delete_view, name='org_unit_delete'),
+    
 
     # Master data
     path('master-data/',                        master_data_list_view,   name='master_data_list'),
