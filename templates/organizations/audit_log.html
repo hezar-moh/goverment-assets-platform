@@ -1,58 +1,157 @@
-{% extends 'shared/base.html' %}
-{% block title %}Audit Trail — GovAsset{% endblock %}
-{% block page_heading %}Audit Trail{% endblock %}
-
-{% block content %}
+{% extends 'shared/base.html' %} {% block title %}Audit Trail — GovAsset{%
+endblock %} {% block page_heading %}Audit Trail{% endblock %} {% block content
+%}
 <div class="page-header">
   <div>
     <h4>Audit Trail</h4>
     <p>
-      Tamper-proof record of all system actions —
-      {% if paginator %}
-      <strong>{{ paginator.count }}</strong> total record{{ paginator.count|pluralize }}
-      {% endif %}
+      Tamper-proof record of all system actions — {% if paginator %}
+      <strong>{{ paginator.count }}</strong> total record{{
+      paginator.count|pluralize }} {% endif %}
     </p>
   </div>
 </div>
 
 {% if is_super_admin %}
-<div class="card" style="padding:40px;text-align:center;">
-  <i class="bi bi-info-circle" style="font-size:2rem;color:var(--info);display:block;margin-bottom:10px;"></i>
-  <p style="color:var(--text-secondary);">
-    Audit logs are stored per ministry schema. Log in as a ministry user to view their audit trail.
+<div class="card" style="padding: 40px; text-align: center">
+  <i
+    class="bi bi-info-circle"
+    style="
+      font-size: 2rem;
+      color: var(--info);
+      display: block;
+      margin-bottom: 10px;
+    "
+  ></i>
+  <p style="color: var(--text-secondary)">
+    Audit logs are stored per ministry schema. Log in as a ministry user to view
+    their audit trail.
   </p>
 </div>
 {% else %}
 
 <div class="filter-bar">
-  <form method="get" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;width:100%;">
-
+  <form
+    method="get"
+    style="
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      width: 100%;
+    "
+  >
     <div class="filter-group">
       <label>Filter by Action</label>
       <select name="action" class="form-select">
         <option value="">All Actions</option>
-        <option value="CREATE" {% if action_filter == 'CREATE' %}selected{% endif %}>Create</option>
-        <option value="UPDATE" {% if action_filter == 'UPDATE' %}selected{% endif %}>Update</option>
-        <option value="DELETE" {% if action_filter == 'DELETE' %}selected{% endif %}>Delete</option>
-        <option value="LOGIN" {% if action_filter == 'LOGIN' %}selected{% endif %}>Login</option>
-        <option value="LOGOUT" {% if action_filter == 'LOGOUT' %}selected{% endif %}>Logout</option>
-        <option value="ACCESS_DENIED" {% if action_filter == 'ACCESS_DENIED' %}selected{% endif %}>Access Denied</option>
+        <option
+          value="CREATE"
+          {%
+          if
+          action_filter=""
+          ="CREATE"
+          %}selected{%
+          endif
+          %}
+        >
+          Create
+        </option>
+        <option
+          value="UPDATE"
+          {%
+          if
+          action_filter=""
+          ="UPDATE"
+          %}selected{%
+          endif
+          %}
+        >
+          Update
+        </option>
+        <option
+          value="DELETE"
+          {%
+          if
+          action_filter=""
+          ="DELETE"
+          %}selected{%
+          endif
+          %}
+        >
+          Delete
+        </option>
+        <option
+          value="LOGIN"
+          {%
+          if
+          action_filter=""
+          ="LOGIN"
+          %}selected{%
+          endif
+          %}
+        >
+          Login
+        </option>
+        <option
+          value="LOGOUT"
+          {%
+          if
+          action_filter=""
+          ="LOGOUT"
+          %}selected{%
+          endif
+          %}
+        >
+          Logout
+        </option>
+        <option
+          value="ACCESS_DENIED"
+          {%
+          if
+          action_filter=""
+          ="ACCESS_DENIED"
+          %}selected{%
+          endif
+          %}
+        >
+          Access Denied
+        </option>
       </select>
     </div>
 
-    <!-- NEW -->
     <div class="filter-group">
       <label>Performed By</label>
       <select name="performed_by" class="form-select">
         <option value="">All Users</option>
         {% for uname in available_users %}
-        <option value="{{ uname }}"
-            {% if user_filter == uname %}selected{% endif %}>
-            {{ uname }}
+        <option
+          value="{{ uname }}"
+          {%
+          if
+          user_filter=""
+          ="uname"
+          %}selected{%
+          endif
+          %}
+        >
+          {{ uname }}
         </option>
         {% endfor %}
       </select>
     </div>
+
+    <div class="filter-group">
+    <label for="role">Role</label>
+    <select name="role" id="role" class="form-select">
+        <option value="">All Roles</option>
+        <option value="SUPER_ADMIN" {% if role_filter == 'SUPER_ADMIN' %}selected{% endif %}>Super Admin</option>
+        <option value="MINISTRY_ADMIN" {% if role_filter == 'MINISTRY_ADMIN' %}selected{% endif %}>Ministry Admin</option>
+        <option value="AGENCY_MANAGER" {% if role_filter == 'AGENCY_MANAGER' %}selected{% endif %}>Agency Manager</option>
+        <option value="FACILITY_CLERK" {% if role_filter == 'FACILITY_CLERK' %}selected{% endif %}>Facility Clerk</option>
+        <option value="AUDITOR" {% if role_filter == 'AUDITOR' %}selected{% endif %}>Auditor</option>
+    </select>
+</div>
 
     <!-- NEW -->
     <div class="filter-group">
@@ -60,9 +159,17 @@
       <select name="module" class="form-select">
         <option value="">All Modules</option>
         {% for mod in available_modules %}
-        <option value="{{ mod }}"
-            {% if module_filter == mod %}selected{% endif %}>
-            {{ mod }}
+        <option
+          value="{{ mod }}"
+          {%
+          if
+          module_filter=""
+          ="mod"
+          %}selected{%
+          endif
+          %}
+        >
+          {{ mod }}
         </option>
         {% endfor %}
       </select>
@@ -72,23 +179,25 @@
     <div class="filter-group">
       <label>Date From</label>
       <input
-          type="date"
-          name="date_from"
-          value="{{ date_from }}"
-          class="form-control">
+        type="date"
+        name="date_from"
+        value="{{ date_from }}"
+        class="form-control"
+      />
     </div>
 
     <!-- NEW -->
     <div class="filter-group">
       <label>Date To</label>
       <input
-          type="date"
-          name="date_to"
-          value="{{ date_to }}"
-          class="form-control">
+        type="date"
+        name="date_to"
+        value="{{ date_to }}"
+        class="form-control"
+      />
     </div>
 
-    <div style="display:flex;gap:8px;">
+    <div style="display: flex; gap: 8px">
       <button type="submit" class="btn btn-primary btn-sm">
         <i class="bi bi-funnel-fill"></i> Filter
       </button>
@@ -97,17 +206,17 @@
         <i class="bi bi-x"></i> Clear
       </a>
     </div>
-
   </form>
 </div>
 
 <div class="card">
-  <div style="overflow-x:auto;">
+  <div style="overflow-x: auto">
     <table class="data-table">
       <thead>
         <tr>
           <th>Action</th>
           <th>Performed By</th>
+          <th>Role</th>
           <th>Module</th>
           <th>Description</th>
           <th>IP Address</th>
@@ -119,25 +228,17 @@
       <tbody>
         {% for log in logs %}
         <tr
-            onclick="window.location='{% url 'audit_log_detail' log.id %}'"
-            style="cursor: pointer;"
-            class="audit-row"
+          onclick="window.location='{% url 'audit_log_detail' log.id %}'"
+          style="cursor: pointer"
+          class="audit-row"
         >
           <td>
-            <span class="badge
-              {% if log.action == 'CREATE' %}badge-create
-              {% elif log.action == 'UPDATE' %}badge-update
-              {% elif log.action == 'DELETE' %}badge-delete
-              {% elif log.action == 'LOGIN' %}badge-login
-              {% elif log.action == 'LOGOUT' %}badge-logout
-              {% else %}badge-denied{% endif %}">
-              <i class="bi bi-
-                {% if log.action == 'CREATE' %}plus-circle
-                {% elif log.action == 'UPDATE' %}pencil
-                {% elif log.action == 'DELETE' %}trash
-                {% elif log.action == 'LOGIN' %}box-arrow-in-right
-                {% elif log.action == 'LOGOUT' %}box-arrow-right
-                {% else %}shield-exclamation{% endif %}">
+            <span
+              class="badge {% if log.action == 'CREATE' %}badge-create {% elif log.action == 'UPDATE' %}badge-update {% elif log.action == 'DELETE' %}badge-delete {% elif log.action == 'LOGIN' %}badge-login {% elif log.action == 'LOGOUT' %}badge-logout {% else %}badge-denied{% endif %}"
+            >
+              <i
+                class="bi bi- {% if log.action == 'CREATE' %}plus-circle {% elif log.action == 'UPDATE' %}pencil {% elif log.action == 'DELETE' %}trash {% elif log.action == 'LOGIN' %}box-arrow-in-right {% elif log.action == 'LOGOUT' %}box-arrow-right {% else %}shield-exclamation{% endif %}"
+              >
               </i>
               {{ log.action }}
             </span>
@@ -145,30 +246,54 @@
 
           <td>
             <div class="user-cell">
-              <div class="avatar avatar-blue" style="width:28px;height:28px;font-size:10px;">
+              <div
+                class="avatar avatar-blue"
+                style="width: 28px; height: 28px; font-size: 10px"
+              >
                 {{ log.performed_by_name|slice:":2"|upper }}
               </div>
-              <span style="font-weight:600;font-size:13px;">
+              <span style="font-weight: 600; font-size: 13px">
                 {{ log.performed_by_name|default:"System" }}
               </span>
             </div>
           </td>
-
           <td>
-            <code style="font-size:11.5px;">{{ log.model_name }}</code>
+            <!-- ← ADD THIS CELL -->
+            {% if log.performed_by_role %}
+            <span class="role-badge role-{{ log.performed_by_role|lower }}">
+              {{ log.performed_by_role|title }}
+            </span>
+            {% else %}
+            <span style="color: #9ca3af">—</span>
+            {% endif %}
+          </td>
+          <td>
+            <code style="font-size: 11.5px">{{ log.model_name }}</code>
           </td>
 
-          <td style="color:var(--text-secondary);max-width:280px;">
+          <td style="color: var(--text-secondary); max-width: 280px">
             <span title="{{ log.object_repr }}">
               {{ log.object_repr|truncatechars:50 }}
             </span>
           </td>
 
-          <td style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);">
+          <td
+            style="
+              font-family: var(--font-mono);
+              font-size: 12px;
+              color: var(--text-muted);
+            "
+          >
             {{ log.ip_address|default:"—" }}
           </td>
 
-          <td style="font-size:12.5px;color:var(--text-muted);white-space:nowrap;">
+          <td
+            style="
+              font-size: 12.5px;
+              color: var(--text-muted);
+              white-space: nowrap;
+            "
+          >
             {{ log.timestamp|date:"d M Y H:i:s" }}
           </td>
 
@@ -177,7 +302,7 @@
             <a
               href="{% url 'audit_log_detail' log.id %}"
               class="btn btn-outline btn-sm"
-              onclick="event.stopPropagation();"
+              onclick="event.stopPropagation()"
             >
               View
             </a>
@@ -195,14 +320,10 @@
         </tr>
         {% endfor %}
       </tbody>
-
     </table>
   </div>
 
-  {% if page %}
-  {% include 'shared/pagination.html' %}
-  {% endif %}
+  {% if page %} {% include 'shared/pagination.html' %} {% endif %}
 </div>
 
-{% endif %}
-{% endblock %}
+{% endif %} {% endblock %}

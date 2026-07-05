@@ -352,7 +352,8 @@ def user_toggle_active_view(request, user_id):
     if editor.role == "MINISTRY_ADMIN":
         if target_user.ministry_schema != editor.ministry_schema:
             messages.error(
-                request, "You can only manage users within your own ministry."
+                request,
+                "You can only manage users within your own ministry."
             )
             return redirect("user_list")
 
@@ -379,13 +380,12 @@ def user_toggle_active_view(request, user_id):
         except Exception as e:
             messages.warning(
                 request,
-                f"Status updated in system but Keycloak sync failed: "
-                f"{str(e)}"
+                f"Status updated in system but Keycloak sync failed: {str(e)}"
             )
 
     action_word = "activated" if target_user.is_active else "deactivated"
 
-    # Write audit log
+    # ── Tenant audit log ─────────────────────────────────────
     _log_user_action(
         schema_name=target_user.ministry_schema,
         editor=editor,
@@ -393,11 +393,47 @@ def user_toggle_active_view(request, user_id):
         target_user=target_user,
         old_value={"is_active": old_status},
         new_value={"is_active": target_user.is_active},
-        request=request, 
+        request=request,
     )
 
-    messages.success(request, f"User '{target_user.username}' has been {action_word}.")
+    # ── Super Admin public audit log ─────────────────────────
+    if editor.role == 'SUPER_ADMIN':
+        try:
+            from authentication.models import SuperAdminAuditLog
+            from authentication.views import get_client_ip
+
+            log_action = (
+                'USER_ACTIVATED'
+                if target_user.is_active
+                else 'USER_DEACTIVATED'
+            )
+
+            SuperAdminAuditLog.objects.create(
+                performed_by_id=editor.id,
+                performed_by_name=editor.get_full_name() or editor.username,
+                performed_by_role=editor.role,
+                action=log_action,
+                description=(
+                    f"{editor.get_full_name() or editor.username} "
+                    f"{'activated' if target_user.is_active else 'deactivated'} "
+                    f"user '{target_user.username}'"
+                ),
+                target_username=target_user.username,
+                old_value={"is_active": old_status},
+                new_value={"is_active": target_user.is_active},
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get("HTTP_USER_AGENT", "")[:500],
+            )
+        except Exception:
+            pass
+
+    messages.success(
+        request,
+        f"User '{target_user.username}' has been {action_word}."
+    )
     return redirect("user_list")
+
+
 
 
 @login_required_custom

@@ -371,27 +371,61 @@ def org_unit_delete_view(request, unit_id):
 @login_required_custom
 @role_required('SUPER_ADMIN', 'MINISTRY_ADMIN', 'AUDITOR')
 def audit_log_view(request):
-    """
-    Show paginated audit trail with filters for action, user,
-    module, date-from, and date-to.
-    
-    Super Admin sees a message — their logs are in the public
-    schema and handled separately (Fix 5).
-    Ministry Admin and Auditor see their ministry's logs only.
-    """
     user = request.user
 
+    # ── SUPER ADMIN: show their own public-schema logs ──────────
     if user.role == 'SUPER_ADMIN':
-        return render(request, 'organizations/audit_log.html', {
-            'logs':          [],
-            'is_super_admin': True,
-            'page_title':    'Audit Logs',
-        })
+        from authentication.models import SuperAdminAuditLog
 
-    # Read all filter values from the URL query string
+        action_filter = request.GET.get('action', '').strip()
+        date_from     = request.GET.get('date_from', '').strip()
+        date_to       = request.GET.get('date_to', '').strip()
+
+        qs = SuperAdminAuditLog.objects.all()
+
+        if action_filter:
+            qs = qs.filter(action=action_filter)
+        if date_from:
+            from django.utils.dateparse import parse_date
+            parsed = parse_date(date_from)
+            if parsed:
+                qs = qs.filter(timestamp__date__gte=parsed)
+        if date_to:
+            from django.utils.dateparse import parse_date
+            parsed = parse_date(date_to)
+            if parsed:
+                qs = qs.filter(timestamp__date__lte=parsed)
+
+        from authentication.pagination import paginate_queryset
+        page, paginator = paginate_queryset(qs, request, per_page=25)
+
+        return render(request, 'organizations/audit_log.html', {
+            'logs':             list(page.object_list),
+            'is_super_admin':   True,
+            'page_title':       'Audit Logs — Platform Level',
+            'action_filter':    action_filter,
+            'date_from':        date_from,
+            'date_to':          date_to,
+            'available_users':  list(
+                SuperAdminAuditLog.objects.values_list(
+                    'performed_by_name', flat=True
+                ).distinct()
+            ),
+            'available_modules': list(
+                SuperAdminAuditLog.objects.values_list(
+                    'action', flat=True
+                ).distinct()
+            ),
+            'page':      page,
+            'paginator': paginator,
+        })
+    # ── END SUPER ADMIN SECTION ──────────────────────────────────
+
+    # Ministry Admin and Auditor — existing code below unchanged
     action_filter   = request.GET.get('action', '').strip()
     user_filter     = request.GET.get('performed_by', '').strip()
     module_filter   = request.GET.get('module', '').strip()
+    role_filter    = request.GET.get('role',         '').strip()  
     date_from       = request.GET.get('date_from', '').strip()
     date_to         = request.GET.get('date_to', '').strip()
 
@@ -404,50 +438,32 @@ def audit_log_view(request):
     try:
         with schema_context(user.ministry_schema):
             from organizations.models import AuditLog
-
             qs = AuditLog.objects.all()
 
-            # ── Apply filters one by one ──────────────────────────
-            
             if action_filter:
                 qs = qs.filter(action=action_filter)
-
             if user_filter:
-                # Filter by performed_by_name (contains search)
-                # We use icontains so partial name matches work too
-                qs = qs.filter(
-                    performed_by_name__icontains=user_filter
-                )
-
+                qs = qs.filter(performed_by_name__icontains=user_filter)
             if module_filter:
                 qs = qs.filter(model_name=module_filter)
-
+            if role_filter:                                        
+                qs = qs.filter(performed_by_role=role_filter)
             if date_from:
-                # date_from is a string like "2025-06-01"
-                # We filter for entries at or after midnight on that date
                 from django.utils.dateparse import parse_date
                 parsed_from = parse_date(date_from)
                 if parsed_from:
                     qs = qs.filter(timestamp__date__gte=parsed_from)
-
             if date_to:
-                # date_to filters up to the end of that day (inclusive)
                 from django.utils.dateparse import parse_date
                 parsed_to = parse_date(date_to)
                 if parsed_to:
                     qs = qs.filter(timestamp__date__lte=parsed_to)
-
-            # ── Build dropdown options from actual data ────────────
-            # These are the unique users and modules that appear in
-            # THIS ministry's logs — so the dropdowns only show
-            # relevant options, not a hardcoded list
 
             available_users = list(
                 AuditLog.objects.values_list(
                     'performed_by_name', flat=True
                 ).distinct().order_by('performed_by_name')
             )
-            # Remove empty strings from the list
             available_users = [u for u in available_users if u]
 
             available_modules = list(
@@ -457,37 +473,28 @@ def audit_log_view(request):
             )
             available_modules = [m for m in available_modules if m]
 
-            # ── Paginate ──────────────────────────────────────────
             from authentication.pagination import paginate_queryset
-            page, paginator = paginate_queryset(
-                qs, request, per_page=25
-            )
+            page, paginator = paginate_queryset(qs, request, per_page=25)
             logs = list(page.object_list)
 
     except Exception as e:
         messages.error(request, f"Error loading audit logs: {str(e)}")
 
     return render(request, 'organizations/audit_log.html', {
-        'logs':              logs,
-        'is_super_admin':    False,
-        'page_title':        'Audit Logs',
-
-        # Current filter values (so the form remembers what was selected)
-        'action_filter':     action_filter,
-        'user_filter':       user_filter,
-        'module_filter':     module_filter,
-        'date_from':         date_from,
-        'date_to':           date_to,
-
-        # Dropdown options
-        'available_users':   available_users,
-        'available_modules': available_modules,
-
-        # Pagination
-        'page':              page,
-        'paginator':         paginator,
+        'logs':               logs,
+        'is_super_admin':     False,
+        'page_title':         'Audit Logs',
+        'action_filter':      action_filter,
+        'user_filter':        user_filter,
+        'module_filter':      module_filter,
+        'role_filter':        role_filter,           
+        'date_from':          date_from,
+        'date_to':            date_to,
+        'available_users':    available_users,
+        'available_modules':  available_modules,
+        'page':               page,
+        'paginator':          paginator,
     })
-
     
 @login_required_custom
 @role_required('SUPER_ADMIN', 'MINISTRY_ADMIN', 'AUDITOR')

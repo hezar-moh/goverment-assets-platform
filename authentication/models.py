@@ -158,3 +158,59 @@ class LoginAttempt(models.Model):
             delta = self.locked_until - timezone.now()
             return max(1, int(delta.total_seconds() / 60))
         return 0
+
+
+
+class SuperAdminAuditLog(models.Model):
+    """
+    Audit log specifically for Super Admin actions that happen
+    in the public schema (pending access reviews, ministry creation,
+    user creation at platform level).
+    
+    Lives in the PUBLIC schema since Super Admin has no ministry schema.
+    This is a SHARED model in the authentication app.
+    """
+
+    ACTION_CHOICES = [
+        ('PENDING_APPROVED', 'Pending Access Approved'),
+        ('PENDING_REJECTED', 'Pending Access Rejected'),
+        ('USER_CREATED',     'User Created'),
+        ('USER_DEACTIVATED', 'User Deactivated'),
+        ('USER_ACTIVATED',   'User Activated'),
+        ('USER_EDITED',      'User Edited'),
+        ('MINISTRY_CREATED', 'Ministry Created'),
+        ('PASSWORD_RESET',   'Password Reset'),
+    ]
+
+    performed_by_id   = models.IntegerField(null=True)
+    performed_by_name = models.CharField(max_length=200, blank=True)
+    performed_by_role = models.CharField(max_length=50, blank=True)
+    action            = models.CharField(max_length=50, choices=ACTION_CHOICES)
+    description       = models.TextField(blank=True)
+    target_username   = models.CharField(max_length=150, blank=True)
+    old_value         = models.JSONField(null=True, blank=True)
+    new_value         = models.JSONField(null=True, blank=True)
+    ip_address        = models.GenericIPAddressField(null=True, blank=True)
+    user_agent        = models.CharField(max_length=500, blank=True)
+    timestamp         = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        app_label = 'authentication'
+        ordering  = ['-timestamp']
+        verbose_name = 'Super Admin Audit Log'
+
+    def __str__(self):
+        return f"{self.action} by {self.performed_by_name} at {self.timestamp}"
+
+    def save(self, *args, **kwargs):
+        """Tamper-proof — same protection as the tenant AuditLog."""
+        if self.pk is not None:
+            raise PermissionError(
+                "SuperAdminAuditLog records are immutable."
+            )
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError(
+            "SuperAdminAuditLog records cannot be deleted."
+        )
