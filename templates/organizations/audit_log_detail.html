@@ -1,4 +1,6 @@
-{% extends 'shared/base.html' %} {% block title %}{{ page_title }}{% endblock %}
+{% extends 'shared/base.html' %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block page_heading %}Audit Log Detail{% endblock %}
 {% block content %}
 <div class="page-header">
   <div class="header-left">
@@ -90,13 +92,17 @@
     </div>
   </div>
 
-  {# ── Before / After Card ── #} {% if changes %}
+  {% if changes %}
   <div class="card detail-card" style="padding: 20px">
     <div class="card-header">
       <h3>
-        {% if log.action == 'CREATE' %} Values Set {% elif log.action ==
-        'DELETE' %} Values Removed {% else %} Before &amp; After Changes {%
-        endif %}
+        {% if log.action == 'CREATE' %}
+          Values Set
+        {% elif log.action == 'DELETE' %}
+          Values Removed
+        {% else %}
+          Before &amp; After Changes
+        {% endif %}
       </h3>
     </div>
     <div class="card-body">
@@ -106,7 +112,8 @@
             <th>Field</th>
             {% if log.action != 'CREATE' %}
             <th>Before</th>
-            {% endif %} {% if log.action != 'DELETE' %}
+            {% endif %}
+            {% if log.action != 'DELETE' %}
             <th>After</th>
             {% endif %}
           </tr>
@@ -117,7 +124,8 @@
             <td class="field-name">{{ change.field }}</td>
             {% if log.action != 'CREATE' %}
             <td class="value-before">{{ change.old_val|default:"—" }}</td>
-            {% endif %} {% if log.action != 'DELETE' %}
+            {% endif %}
+            {% if log.action != 'DELETE' %}
             <td class="value-after">{{ change.new_val|default:"—" }}</td>
             {% endif %}
           </tr>
@@ -137,10 +145,13 @@
   <div class="card detail-card">
     <div class="card-body">
       <p class="no-changes-note">
-        {% if log.action == 'LOGIN' or log.action == 'LOGOUT' %} No field
-        changes — this is a session event. {% elif log.action == 'ACCESS_DENIED'
-        %} No field changes — this is a security event. {% else %} No
-        before/after detail recorded for this entry. {% endif %}
+        {% if log.action == 'LOGIN' or log.action == 'LOGOUT' %}
+          No field changes — this is a session event.
+        {% elif log.action == 'ACCESS_DENIED' %}
+          No field changes — this is a security event.
+        {% else %}
+          No before/after detail recorded for this entry.
+        {% endif %}
       </p>
     </div>
   </div>

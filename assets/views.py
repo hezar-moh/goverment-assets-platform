@@ -13,16 +13,9 @@ from .models import Asset, AssetCategory
 
 
 def _get_client_ip(request):
-    """
-    Extract the real client IP address from the request.
-    Checks X-Forwarded-For first (set by proxies/load balancers)
-    then falls back to REMOTE_ADDR (the direct connection IP).
-    """
+    """Get the real client IP from proxy headers or the direct connection."""
     x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
     if x_forwarded_for:
-        # X-Forwarded-For can be a comma-separated list like:
-        # "203.0.113.5, 70.41.3.18, 150.172.238.178"
-        # The FIRST one is always the original client
         ip = x_forwarded_for.split(",")[0].strip()
     else:
         ip = request.META.get("REMOTE_ADDR")
@@ -86,9 +79,8 @@ def _load_asset_form_data(ministry_schema):
 
 
 def generate_asset_number(ministry_schema, category_code):
-    """Generate a unique asset number like MOH-ICT-2025-0001.
-    Finds the highest existing sequence and increments from there
-    to avoid race conditions under concurrent requests.
+    """Auto-generate an asset number like MOH-ICT-2025-0001.
+    Uses the highest existing sequence so concurrent requests don't collide.
     """
     from django.utils import timezone
 
@@ -557,16 +549,6 @@ def asset_delete_view(request, asset_id):
             return redirect("asset_list")
 
     return redirect("asset_list")
-
-
-def _get_client_ip(request):
-    """Extract real client IP — checks proxy headers first."""
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        ip = x_forwarded_for.split(',')[0].strip()
-    else:
-        ip = request.META.get('REMOTE_ADDR')
-    return ip
 
 
 def _log_asset_action(schema_name, user, action, asset, old_value, request=None):

@@ -17,11 +17,16 @@ from authentication.api_serializers import (
 logger = logging.getLogger('authentication')
 
 
-class AssetListCreateAPIView(APIView):
-    """GET /api/assets/ — list all assets | POST /api/assets/ — create a new asset.
+def _get_client_ip(request):
+    """Get the real client IP — checks proxy forwarding headers first."""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        return x_forwarded_for.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR', '')
 
-    Query params for GET: ?search=laptop&status=ACTIVE&category=1&page=2
-    """
+
+class AssetListCreateAPIView(APIView):
+    """GET /api/assets/ — list all assets | POST /api/assets/ — create a new asset."""
     permission_classes = [
         IsAuthenticated,
         HasMinistrySchema,
@@ -249,6 +254,7 @@ class AssetListCreateAPIView(APIView):
                     performed_by_name=(
                         user.get_full_name() or user.username
                     ),
+                    performed_by_role=user.role,
                     action='CREATE',
                     model_name='Asset',
                     object_id=str(asset.id),
@@ -260,6 +266,8 @@ class AssetListCreateAPIView(APIView):
                         'status':       asset.status,
                         'source':       'API',
                     },
+                    ip_address=_get_client_ip(request),
+                    user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
                 )
 
             serializer = AssetSerializer(asset)
@@ -434,6 +442,7 @@ class AssetDetailAPIView(APIView):
                     performed_by_name=(
                         user.get_full_name() or user.username
                     ),
+                    performed_by_role=user.role,
                     action='UPDATE',
                     model_name='Asset',
                     object_id=str(asset.id),
@@ -445,6 +454,8 @@ class AssetDetailAPIView(APIView):
                         'condition': asset.condition,
                         'source':    'API',
                     },
+                    ip_address=_get_client_ip(request),
+                    user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
                 )
 
             serializer = AssetSerializer(asset)
@@ -494,6 +505,7 @@ class AssetDetailAPIView(APIView):
                     performed_by_name=(
                         user.get_full_name() or user.username
                     ),
+                    performed_by_role=user.role,
                     action='DELETE',
                     model_name='Asset',
                     object_id=str(asset.id),
@@ -505,6 +517,8 @@ class AssetDetailAPIView(APIView):
                         'source':       'API',
                     },
                     new_value=None,
+                    ip_address=_get_client_ip(request),
+                    user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
                 )
 
                 asset_number = asset.asset_number

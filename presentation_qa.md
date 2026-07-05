@@ -34,6 +34,10 @@
 | 23 | [Dev Setup: Web + Mobile](#part-23) | How two developers work together + which fixes affect mobile vs web only |
 | 24 | [Complete File-by-File Explanation](#part-24) | Every folder and every `.py` file explained, with key classes and code evidence |
 | 25 | [Important Commands & Setup Reference](#part-25) | Full step-by-step: PostgreSQL, find IP, start Keycloak, start Django, connect phone, register domain, Flutter rebuild, demo data, troubleshooting, test accounts |
+| 26 | [The Full 10-Group Project](#part-26) | Complete project structure, Group 1's role as security/auth foundation, dependency matrix (all 9 groups depend on us), dissertation titles, where our API fits |
+| 27 | [Tonight & Tomorrow Checklist](#part-27) | What to do tonight, tomorrow morning, 30 mins before panel, what to bring, what NOT to do |
+| 28 | [Defense Strategies](#part-28) | What If scenarios — crash, freeze, missing features, technology choices, no tests, performance, forgetting your lines |
+| 29 | [Confidence Tips](#part-29) | Posture, eye contact, voice, recovery from stumbling, the 3-bullet rule, owning weaknesses, the panel's real questions, final pep talk |
 
 ---
 
@@ -4577,3 +4581,364 @@ http://192.168.43.105:8000
 ```
 
 Print or screenshot this page and keep it next to your laptop.
+
+---
+
+<a name="part-26"></a>
+## PART 26: THE FULL 10-GROUP PROJECT — Where Group 1 Fits
+
+> **In this part:**
+> - [The complete project structure](#part-26a)
+> - [Group 1 is the FOUNDATION](#part-26b)
+> - [Dependency matrix — every group depends on us](#part-26c)
+> - [What each group delivers](#part-26d)
+> - [How our API serves all groups](#part-26e)
+> - [Panel talking points](#part-26f)
+
+<a name="part-26a"></a>
+### The Complete Project Structure
+
+The whole project is called **"Government Asset Management System"** and is split into **10 groups**. Each group builds one module. Together they cover the complete lifecycle of government assets — from registration to disposal, including maintenance, finance, GIS, compliance, and analytics.
+
+| Group | Module Name | Focus Area | Dissertation Title |
+|-------|------------|-----------|-------------------|
+| **1** | **Administration, Security & Multitenancy** | RBAC, SSO, audit trails, master data, multi-tenant isolation | *Design and Implementation of a Secure Multi-Tenant Platform for Government Asset Management Systems* |
+| 2 | Asset & Property Register Module | Centralized asset registry, classification, hierarchy, document management | *Centralized Digital Asset Registry with Lifecycle Tracking for Public Sector Properties* |
+| 3 | Lifecycle Planning & Capital Projects | Asset lifecycle planning, condition assessment, CAPEX analysis | *Lifecycle Cost Analysis and Capital Project Portfolio Management System* |
+| 4 | Maintenance & Operations (CMMS) | Work orders, preventive maintenance, service contracts, mobile technician app | *Computerized Maintenance Management System with Mobile Field Service Capabilities* |
+| 5 | Financial Management & Valuation | Depreciation, lease management, budgeting, financial reporting | *Integrated Financial Management System for Asset Valuation, Depreciation and Lease Accounting* |
+| 6 | Land Management & GIS Integration | Cadastral data, GIS visualization, space management, room bookings | *GIS-Enabled Spatial Management System with BIM Integration for Smart Facilities* |
+| 7 | Energy, Sustainability & IoT | Utility monitoring, smart meters, carbon footprint, ESG dashboards | *IoT-Enabled Energy Monitoring and Sustainability Management System for Smart Buildings* |
+| 8 | Compliance, Risk & Safety | Statutory inspections, risk registers, incident reporting, CAPA tracking | *Integrated Compliance Tracking and Risk Management System for Facility Safety* |
+| 9 | Inventory, Stores & Procurement | Spare parts, barcode/RFID, purchase orders, supplier management | *RFID-Based Inventory Management System with Automated Procurement Workflows* |
+| 10 | Analytics, Dashboards & Reporting | KPIs, standard reports, drill-down, predictive analytics, BI | *Business Intelligence and Decision Support System for Property Management Analytics* |
+
+<a name="part-26b"></a>
+### Group 1 Is the FOUNDATION — Every Other Group Depends on Us
+
+Group 1 is not just one module among ten. **Group 1 is the platform that every other module runs on top of.** Here is why:
+
+**What Group 1 provides to everyone else:**
+
+1. **Authentication** — Every user in every group must log in through our Keycloak SSO. No other group has their own login page.
+2. **Authorization (RBAC)** — Our 5-role system (Super Admin → Facility Clerk) controls what each user can access. Groups 2-10 simply check "what role does this user have?"
+3. **Multi-Tenant Isolation** — Each ministry's data is in a separate PostgreSQL schema. Groups 2-10 never see data from other ministries. Our django-tenants setup makes this automatic.
+4. **API Security (JWT)** — Our SimpleJWT configuration issues tokens that all other groups use to authenticate API calls. The `/api/auth/verify-token/` endpoint is how Groups 2-10 validate users.
+5. **Audit Trail** — Every action across ALL modules is logged in our AuditLog table with IP, user, timestamp, old/new values.
+6. **Master Data** — Asset categories, locations, cost centres — these are configured in our master data tools and used by all other groups.
+7. **User Management** — Only Group 1 creates and manages users. Groups 2-10 never need to create user accounts.
+
+**The dependency matrix from the project document:**
+
+```
+Group 1 → depends on: NOBODY
+         → everyone depends on: Groups 2, 3, 4, 5, 6, 7, 8, 9, 10
+
+Group 2 → depends on: Group 1
+Group 3 → depends on: Groups 1, 2
+Group 4 → depends on: Groups 1, 2, 9
+Group 5 → depends on: Groups 1, 2, 3
+Group 6 → depends on: Groups 1, 2
+Group 7 → depends on: Groups 1, 2, 6
+Group 8 → depends on: Groups 1, 2, 4
+Group 9 → depends on: Groups 1, 2, 4
+Group 10 → depends on: ALL groups for data
+```
+
+**Read this carefully:** Group 1 is the **only group that depends on nobody**. Every single other group needs Group 1 to function. If our login system is down, the entire system stops — no one can access anything.
+
+<a name="part-26c"></a>
+### Dependency Matrix Explained Simply
+
+Think of it like building a house:
+
+- **Group 1** = The foundation and electricity. Without it, nothing works.
+- **Group 2** = The rooms and walls (asset register). Built on the foundation.
+- **Groups 3-9** = The plumbing, wiring, painting (modules). Each needs the rooms and the foundation.
+- **Group 10** = The security cameras (analytics). Monitors everything.
+
+If you try to build the walls (Group 2) without the foundation (Group 1), the walls collapse. If you try to paint (Group 7) without rooms (Group 2), where do you paint? This is exactly how the dependency matrix works.
+
+<a name="part-26d"></a>
+### What Group 1 Specifically Delivers (From the Project Document)
+
+**Scope (what we cover):**
+
+- Role-Based Access Control with hierarchical organization (ministry → agency → facility)
+- Single Sign-On integration with Keycloak
+- Full audit trails for changes to master data and transactions
+- Configurable master data: asset categories, locations, cost centres, user roles, workflows
+- Multi-tenancy: separate data, users, and configurations per ministry
+- Centralized management dashboard
+
+**Key Deliverables (what we built):**
+
+1. RBAC system with hierarchical organization and multi-tenancy support
+2. SSO integration (Keycloak) setup and configuration
+3. Audit trail logs and reporting interface
+4. Master data configuration tools (categories, locations, cost centres, roles)
+5. User management dashboard and admin controls
+6. Tenant management interface (ministry onboarding with schema isolation)
+7. Security and access management documentation
+8. REST API with JWT authentication for mobile and other groups
+
+<a name="part-26e"></a>
+### How Our API Serves All Groups 2-10
+
+The API endpoints we built are not just for our own mobile app. They are the **official integration point** for all 9 other groups. Here is what each group uses from us:
+
+| Group | What they need from our API |
+|-------|---------------------------|
+| 2 (Asset Register) | User authentication + role check before CRUD operations |
+| 3 (Lifecycle) | Verify who can create/edit capital projects |
+| 4 (Maintenance) | Authenticate technicians on mobile app + assign work orders by role |
+| 5 (Finance) | Check if user has MINISTRY_ADMIN role to approve budgets |
+| 6 (GIS) | Authenticate users viewing spatial data |
+| 7 (Energy/IoT) | Authenticate system-to-system API calls from smart meters |
+| 8 (Compliance) | Check AUDITOR role for inspection reports |
+| 9 (Inventory) | Authenticate store clerks scanning barcodes |
+| 10 (Analytics) | Role-based dashboard access (executive vs technician views) |
+
+**The key endpoint:**
+```
+GET /api/auth/verify-token/
+Authorization: Bearer <token>
+→ Returns: { "role": "MINISTRY_ADMIN", "ministry_schema": "moh_schema", ... }
+```
+
+Any group can call this endpoint with a user's JWT token and instantly know their role, ministry, and permissions. This is how the entire system shares authentication through us.
+
+<a name="part-26f"></a>
+### Panel Talking Points — What to Say About the 10-Group Structure
+
+**If they ask: "How does your system connect to other groups?"**
+
+> *"Our platform is the security and administration foundation. We provide authentication, role-based access control, and multi-tenant data isolation that all 9 other groups depend on. Every user in the entire system logs in through our Keycloak SSO. Other groups call our API to verify user identities and check permissions. This is documented in the project's dependency matrix — Group 1 depends on nobody, but every other group depends on us."*
+
+**If they ask: "What if another group wants to add their own login?"**
+
+> *"That would defeat the purpose of SSO. Our Keycloak is the single entry point for the entire system. If another group created their own login, users would need multiple credentials and the audit trail would be broken. The project design explicitly makes Group 1 the sole authentication provider."*
+
+**If they ask: "How do you handle data isolation between ministries?"**
+
+> *"Each ministry has its own PostgreSQL schema, managed by django-tenants. When a user logs in, our system knows which schema to route them to based on their ministry_schema field. Groups 2-10 never see cross-ministry data because the database itself enforces the isolation at the schema level."*
+
+**If they ask: "What is your dissertation title?"**
+
+> *"Design and Implementation of a Secure Multi-Tenant Platform for Government Asset Management Systems."*
+
+**If they ask: "What specific security features did you implement?"** (refer to Part 8 for the full 15-feature list, but here are the top ones relevant to Group 1's role):
+
+> *"We implemented 15 security features including: Keycloak SSO authentication, role-based access control with 5 role levels, multi-tenant data isolation via PostgreSQL schemas, JWT token authentication with 30-minute access tokens, tamper-proof audit trail with IP tracking, account lockout after 5 failed attempts, and session management with configurable timeouts."*
+
+**If they ask: "How is your project different from the other groups?"**
+
+> *"We are the platform team. Other groups focus on specific business modules — asset register, maintenance, finance, GIS, compliance. We focus on security, identity, and data isolation. Without our platform, the other groups would have no authentication system, no user management, no audit trail, and no data isolation between ministries. Every single group depends on us."*
+
+---
+
+<a name="part-27"></a>
+## PART 27: TONIGHT & TOMORROW CHECKLIST — What to do, when to do it
+
+### Tonight (Sunday July 5)
+
+- [ ] **Verify everything starts** — Run startup sequence once more
+- [ ] **Check your laptop** — Fully charged, charger packed, no pending Windows updates
+- [ ] **Test the demo** — Click through login → assets → audit log → API docs
+- [ ] **Open every page** — Dashboard, Assets, Audit Log, Users, Ministries, Master Data, Org Units, API Swagger
+- [ ] **Read Part 19 aloud** — The one-paragraph answer. Say it until it flows naturally
+- [ ] **Pack for tomorrow:** Laptop + charger, mouse, notebook, pen, water bottle, your phone (for mobile demo)
+- [ ] **Set alarm** — Give yourself 1.5 hours before panel time
+- [ ] **Sleep** — A tired brain forgets even simple things
+
+### Tomorrow Morning (Monday July 6)
+
+- [ ] **Start PostgreSQL** — `net start postgresql-x64-17` (or whatever version)
+- [ ] **Open pgAdmin** — Have `\dn` or the schema list ready
+- [ ] **Start Keycloak** — `cd C:\keycloak-25.0.1\bin && .\kc.bat start-dev --http-port=8180`
+- [ ] **Wait 15+ seconds**, then open `http://localhost:8180` to confirm it's up
+- [ ] **Start Django** — `python manage.py runserver 0.0.0.0:8000`
+- [ ] **Open `http://localhost:8000`** — Confirm the login page loads
+- [ ] **Log in as Super Admin** — Verify test data exists
+- [ ] **Open Keycloak admin** — `http://localhost:8180` → admin/admin123 → Users tab
+- [ ] **Swagger docs** — Open `http://localhost:8000/api/docs/` — confirm it renders
+- [ ] **Leave everything running** — Don't close any terminal until the panel starts
+
+### 30 Minutes Before Panel
+
+- [ ] **Hard refresh browser** (Ctrl+Shift+R) — Clear any cached old CSS
+- [ ] **Close all background apps** — Zoom/Teams/notifications off
+- [ ] **Maximize the browser** — So the panel can see the full UI
+- [ ] **Open 3 tabs** — Tab 1: Your app (logged in as Super Admin). Tab 2: Keycloak admin. Tab 3: Swagger docs
+- [ ] **Put your phone on silent** — No buzzes during demo
+- [ ] **Deep breath** — You know this system. You built it.
+
+### What to Bring to the Panel Table
+
+| Item | Why |
+|------|-----|
+| Laptop (charged) | The main demo machine |
+| Charger | Just in case |
+| Mouse | More precise than trackpad for clicking through UI |
+| Notebook + pen | Write down panel questions you want to address |
+| Water bottle | Dry mouth is real |
+| Your phone | For the mobile app demo (if needed) |
+
+### What NOT to Do
+
+- ❌ **Don't read from the screen** — Look at the panel, not your laptop
+- ❌ **Don't say "I don't know" and stop** — Say "I haven't tested that, but based on the design..." (Part 15 style)
+- ❌ **Don't apologise** — Never say "Sorry, this is not perfect." Just say what it does
+- ❌ **Don't rush** — Speak at normal pace. Pauses are fine. Silence is better than "ummm"
+- ❌ **Don't minimise a broken tab** — Just close it. Don't show them the error
+
+---
+
+<a name="part-28"></a>
+## PART 28: DEFENSE STRATEGIES — What If Things Go Wrong
+
+### What If: The demo freezes or crashes
+
+**Stay calm.** Say: *"Let me restart that process."* Close the terminal, restart Django. Keep talking while it loads:
+
+> *"While that restarts — Django's development server reloads in about 5 seconds. This is a development environment, so there is no production-grade load balancer or process manager. In production, systems like Gunicorn and NGINX would handle this automatically with zero downtime."*
+
+This turns a crash into a demonstration that you understand production deployment.
+
+### What If: Keycloak won't start (port already in use)
+
+**Say:** *"Let me check what is using port 8180."* Run:
+```
+netstat -ano | findstr :8180
+```
+Then `taskkill /PID [number] /F`. If that doesn't work, restart your PC (5 minutes). If asked why:
+
+> *"Keycloak needs port 8180 for its authentication service. If another program grabbed that port, Keycloak cannot start. In production, we run Keycloak on a separate server so this never happens."*
+
+### What If: The panel asks about a feature you don't have
+
+Never say "We didn't have time." Instead:
+
+> *"That is on our roadmap. The current system focuses on the core asset register and security foundation. Features like [their feature] would be the next logical step after deployment. Our architecture supports it because we built with extensibility in mind."*
+
+### What If: The panel asks "So what did YOU actually code?"
+
+This is a trap question — they want to know if you copied code or understood it. Answer with specific code references:
+
+> *"I wrote the Keycloak OIDC backend in authentication/oidc_backend.py — about 90 lines that bridge Keycloak login to Django users. I designed the multi-tenancy setup with django-tenants in tenants/models.py. I built the 5-role access control system with the decorators and permission classes. I created the audit log system with tamper-proof records. I wrote all the API endpoints for mobile authentication and the Swagger documentation."*
+
+### What If: The panel asks "Why did you choose this technology?"
+
+Use the "Three Reasons" structure — gives a confident, structured answer:
+
+**PostgreSQL:** *"Three reasons: (1) Schema support — it is the only major database that lets us give each ministry its own private set of tables. (2) Mature and well-documented — the most trusted open-source database for government systems. (3) Django has first-class PostgreSQL support including JSON fields and array fields."*
+
+**Django:** *"Three reasons: (1) The ORM makes database queries simple and secure — no raw SQL. (2) django-tenants integrates natively with Django's ORM for multi-tenancy. (3) Django has built-in admin, authentication, and middleware systems that saved us months of development time."*
+
+**Keycloak:** *"Three reasons: (1) It is the industry standard for SSO — used by governments and enterprises worldwide. (2) It handles password security, brute-force protection, and session management so we don't have to build those from scratch. (3) It supports OpenID Connect, which lets us authenticate both web browser users and API users with the same identity source."*
+
+**django-tenants:** *"Three reasons: (1) It automatically switches PostgreSQL schemas on every request — we do not have to write WHERE ministry_id = X on every query. (2) It provides true data isolation — the database itself prevents cross-ministry access. (3) It integrates with Django's ORM seamlessly — all our existing models work without changes."*
+
+### What If: The panel says "Your system has no tests"
+
+Be honest. Do not make excuses.
+
+> *"You are correct — we have zero automated tests. This is a prototype, not a production system. The focus was on building the complete feature set first: multi-tenancy, SSO, API, audit trail, and all the CRUD operations. In production, we would add test coverage before deployment, starting with the authentication API since that is the most critical path."*
+
+If they push harder:
+
+> *"For a production government system, I would write tests for: (1) Login and token validation — the most security-critical path. (2) Multi-tenancy isolation — proving a user from MOH cannot see MOF data. (3) Audit log integrity — proving records cannot be modified. In a real deployment, these would be mandatory."*
+
+### What If: The panel asks about performance
+
+> *"The current system ran 0 queries against live data — we have no real data. Based on the database design, each ministry's schema is independent, so query performance only depends on that ministry's data size. Indexes on asset_number, status, and category already exist. For large-scale deployment, I would add database connection pooling with PgBouncer and cache frequently accessed data with Redis."*
+
+### What If: You forget something or freeze
+
+**Pause.** Take a breath. Say:
+
+> *"Let me think about that for a moment."*
+
+A 5-second pause feels long to you but normal to the audience. Do not fill silence with "ummm" or "ahhh." If you still cannot remember, say:
+
+> *"I know we handle that, but I want to give you an accurate answer. Let me check the code quickly."*
+
+Then open the relevant file and read from it. This shows you know WHERE the answer is, even if you can't recite it.
+
+---
+
+<a name="part-29"></a>
+## PART 29: CONFIDENCE TIPS — How to Sound Like You Own This Project
+
+### Posture
+- Sit up straight, both feet on the floor
+- Put your hands on the table — not in your lap, not crossed
+- When explaining, use hand gestures (open palms) — it makes you look confident
+
+### Eye Contact
+- Look at the person who asked the question
+- When answering, rotate eye contact across all panel members
+- Do NOT stare at your screen while explaining
+
+### Voice
+- Speak slower than you think you need to — nerves speed you up
+- Pause between sentences. A 1-second pause sounds natural
+- Drop your pitch at the end of sentences (not up — up sounds like a question)
+- The last word of each sentence should be LOUDER, not quieter
+
+### The "Confident Stumble" Recovery
+If you trip over a word or lose your train of thought:
+
+1. **Stop.** 
+2. **Smile.** 
+3. **Say:** *"Let me rephrase that."*
+4. **Start the sentence again from the beginning.**
+
+This makes you look thoughtful, not confused. The panel will respect the recovery more than the stumble.
+
+### The 3-Bullet Rule
+Never give a long rambling answer. Structure everything into 3 points:
+
+> *"There are three reasons for that. First... Second... Third..."*
+
+This works for: technology choices, security features, design decisions, comparison questions. Practise it.
+
+### Own Your Weaknesses
+The panel WILL find something missing. If you get defensive, you lose. If you own it, you win.
+
+**Bad:** *"We didn't have time for tests."*
+
+**Good:** *"Tests are the most important thing we would add before production. The authentication API needs tests. The multi-tenancy isolation needs tests. The audit log integrity needs tests. I know exactly what to test and how to test it — we just focused on features first."*
+
+### The Panel's Real Questions
+
+The panel is not trying to fail you. They are asking:
+
+| They ask | They really mean |
+|----------|-----------------|
+| "Why this database?" | "Do you understand trade-offs?" |
+| "What about security?" | "Did you think about attacks?" |
+| "How would you scale this?" | "Do you know what production looks like?" |
+| "What did you learn?" | "Can you reflect on your work?" |
+| "What would you change?" | "Are you honest about weaknesses?" |
+
+Answer the real question, not the literal question.
+
+### Final Pep Talk
+
+You have read this entire guide. You know:
+- How every request flows from URL to response
+- Why you chose every technology
+- How multi-tenancy works at the database level
+- How Keycloak SSO works end to end
+- What every file in your project does
+- How your system connects to all 9 other groups
+- What to say when things go wrong
+
+**You are the most prepared person in that room.**
+
+The panel has not read a 4,700-line guide. They have a rubric. You have deep knowledge. When they ask a question, you will either know the answer or know exactly where to find it.
+
+Now close this file. Stand up. Walk to the mirror. Say the one-paragraph answer from Part 19 out loud. Do it three times. Then sleep.
+
+You have got this.

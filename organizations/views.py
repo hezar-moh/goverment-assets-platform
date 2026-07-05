@@ -425,7 +425,7 @@ def audit_log_view(request):
     action_filter   = request.GET.get('action', '').strip()
     user_filter     = request.GET.get('performed_by', '').strip()
     module_filter   = request.GET.get('module', '').strip()
-    role_filter    = request.GET.get('role',         '').strip()  
+
     date_from       = request.GET.get('date_from', '').strip()
     date_to         = request.GET.get('date_to', '').strip()
 
@@ -446,8 +446,6 @@ def audit_log_view(request):
                 qs = qs.filter(performed_by_name__icontains=user_filter)
             if module_filter:
                 qs = qs.filter(model_name=module_filter)
-            if role_filter:                                        
-                qs = qs.filter(performed_by_role=role_filter)
             if date_from:
                 from django.utils.dateparse import parse_date
                 parsed_from = parse_date(date_from)
@@ -487,7 +485,6 @@ def audit_log_view(request):
         'action_filter':      action_filter,
         'user_filter':        user_filter,
         'module_filter':      module_filter,
-        'role_filter':        role_filter,           
         'date_from':          date_from,
         'date_to':            date_to,
         'available_users':    available_users,

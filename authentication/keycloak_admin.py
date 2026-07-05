@@ -54,11 +54,10 @@ class KeycloakAdminService:
         }
 
     def create_user(self, username, email, first_name, last_name, password, role, ministry_schema):
-        """Create a user in Keycloak. Password is set in a separate call (Keycloak requires this). Returns the keycloak_id UUID."""
+        """Create a user in Keycloak (creates user, then sets password in a separate call). Returns the keycloak_id UUID."""
         headers  = self._get_headers()
         base_url = f"{self.server_url}/admin/realms/{self.realm}"
 
-        # ── Step 1: Create the user ───────────────────────────────────────────
         user_data = {
             'username':   username,
             'email':      email,
@@ -79,9 +78,7 @@ class KeycloakAdminService:
         )
 
         if create_response.status_code == 409:
-            raise Exception(
-                f"Username '{username}' already exists in Keycloak."
-            )
+            raise Exception(f"Username '{username}' already exists in Keycloak.")
 
         if create_response.status_code not in [201, 200]:
             raise Exception(
@@ -90,9 +87,7 @@ class KeycloakAdminService:
                 f"Response: {create_response.text}"
             )
 
-        # ── Step 2: Get the new user's ID ─────────────────────────────────────
-        # Keycloak returns the new user's URL in the Location header
-        # The UUID is the last part of that URL
+        # Keycloak returns the new user's UUID in the Location header
         location = create_response.headers.get('Location', '')
         keycloak_id = location.split('/')[-1]
 
@@ -106,24 +101,19 @@ class KeycloakAdminService:
                 f"for username '{username}'"
             )
 
-        # ── Step 3: Set the password ──────────────────────────────────────────
         password_response = requests.put(
             f"{base_url}/users/{keycloak_id}/reset-password",
             json={
                 'type':      'password',
                 'value':     password,
                 'temporary': False,
-                # temporary=False means user does NOT need to change
-                # password on first login
             },
             headers=headers,
             timeout=10
         )
 
         if password_response.status_code not in [204, 200]:
-            # Password failed — delete the user we just created
-            # so we don't have a user without a password
-            self.delete_user(keycloak_id)
+            self.delete_user(keycloak_id)  # rollback: don't leave a user without a password
             raise Exception(
                 f"Failed to set password for '{username}' in Keycloak. "
                 f"Status: {password_response.status_code}"
