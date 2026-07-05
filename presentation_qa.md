@@ -12,7 +12,7 @@
 | 1 | [Django Request Flow](#part-1) | Step-by-step: what happens from typing a URL to getting a response |
 | 2 | [Multi-tenancy](#part-2) | What multi-tenancy means (apartment analogy) |
 | 3 | [django-tenants](#part-3) | How django-tenants creates separate schemas per ministry, with code evidence |
-| 4 | [Keycloak SSO Flow](#part-4) | The 14-step login flow + Keycloak purpose + Django vs Keycloak relationship |
+| 4 | [Keycloak SSO Flow](#part-4) | The 14-step login flow + Keycloak purpose + sessions + session expiry (3 timers) |
 | 5 | [Keycloak vs SimpleJWT](#part-5) | When each is used, why mobile doesn't use Keycloak, why web doesn't use JWT |
 | 6 | [0.0.0.0:8000 Explained](#part-6) | Why we use it, what happens if we don't |
 | 7 | [All Code Components](#part-7) | Decorators, serializers, middleware, permissions, exception handler, pagination, helper functions explained |
@@ -31,7 +31,7 @@
 | 20 | [CSS Quick Reference](#part-20) | How to change colors, text size, backgrounds — inline CSS & Bootstrap Icons |
 | 21 | [Database Deep Dive](#part-21) | All tables, columns, why shared vs private schemas, why PostgreSQL auto-starts |
 | 22 | [Making the System Live](#part-22) | Production setup, domains, code changes, NGINX proxy, load balancers, X-Forwarded-For IP headers explained |
-| 23 | [Dev Setup: Web + Mobile](#part-23) | How two developers work together, same WiFi, different laptops |
+| 23 | [Dev Setup: Web + Mobile](#part-23) | How two developers work together + which fixes affect mobile vs web only |
 | 24 | [Complete File-by-File Explanation](#part-24) | Every folder and every `.py` file explained, with key classes and code evidence |
 | 25 | [Important Commands & Setup Reference](#part-25) | Full step-by-step: PostgreSQL, find IP, start Keycloak, start Django, connect phone, register domain, Flutter rebuild, demo data, troubleshooting, test accounts |
 
@@ -464,6 +464,97 @@ When you log out:
 1. Django destroys its session (you're logged out of Django)
 2. Django tells Keycloak to destroy its session too (you're logged out of Keycloak)
 3. Both sessions are gone
+
+### Session expiry — Why you get asked to sign in again
+
+You noticed that if you leave the system idle for a while, or switch to another tab for a long time, you come back and it asks you to sign in again. This is called **session expiry** and it is one of your security features — not a bug.
+
+There are actually **three separate timeout systems** running in your project simultaneously. Each one works differently depending on whether you are on the web or mobile.
+
+#### System 1 — Django Session Timeout (Web Platform)
+
+When you log into the web platform, Django creates a **session** — a record stored in your database that says "this browser is logged in as user X."
+
+This session has a time limit. In `config/settings.py`:
+
+```python
+SESSION_COOKIE_AGE = 28800        # 8 hours (in seconds)
+SESSION_COOKIE_HTTPONLY = True    # JavaScript cannot steal this cookie
+```
+
+28800 seconds = 8 hours. After 8 hours of inactivity, the session expires and Django makes you log in again.
+
+**Did you build this or did it come automatically?** You configured it. Django's session system exists by default, but the 8-hour limit is something you deliberately set. A typical Django default is 2 weeks — you shortened it to 8 hours because a government platform should not stay logged in for 2 weeks on an unattended computer.
+
+**How to check:**
+```
+Open config/settings.py → search for SESSION_COOKIE_AGE
+Divide by 3600 to get hours: 28800 ÷ 3600 = 8 hours
+```
+
+**How to change it (e.g., to 4 hours):**
+```python
+SESSION_COOKIE_AGE = 14400   # 4 hours (4 × 60 × 60)
+```
+
+#### System 2 — Keycloak Session Timeout (Web Login)
+
+Keycloak has its own separate session. When a user logs in through Keycloak's page, Keycloak creates its own session remembering "this browser authenticated as user X."
+
+This matters for **SSO (Single Sign-On)** — if a user has a valid Keycloak session and navigates to another system connected to the same Keycloak, they don't need to type their password again. But if the Keycloak session expires, even a valid Django session would force a re-authentication through Keycloak.
+
+**Where is this configured?** In the Keycloak admin panel at `http://localhost:8180`:
+```
+Login as admin → govasset realm → Realm Settings → Sessions tab
+```
+You will see settings like:
+- **SSO Session Idle** — how long a session can be idle before Keycloak expires it
+- **SSO Session Max** — the absolute maximum lifetime regardless of activity
+
+**Did you build this?** No — Keycloak manages this entirely on its own. You only interact with it through the Keycloak admin panel.
+
+#### System 3 — JWT Token Expiry (Mobile App and API)
+
+The mobile app does NOT use Django sessions or Keycloak sessions. It uses **JWT tokens**. These tokens have their own expiry built directly into them.
+
+In `config/settings.py`:
+
+```python
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME':  timedelta(minutes=30),   # Token dies after 30 min
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),        # Refresh lasts 1 day
+}
+```
+
+**Access token** — lasts 30 minutes. After 30 minutes, any API call the mobile app makes gets a 401 Unauthorized response. The app uses the refresh token to silently get a new access token without making the user type their password again.
+
+**Refresh token** — lasts 1 day. After 1 day without any app activity, the refresh token expires. The mobile app returns to the login screen and the user must type their password again.
+
+**Did you build this?** You configured it. The `djangorestframework-simplejwt` library handles the token creation — but the 30-minute and 1-day limits are values you set.
+
+#### The complete picture — Three timers running at once
+
+```
+WEB PLATFORM USER
+─────────────────
+Opens browser → logs in through Keycloak → Django creates a session
+
+Timer 1: Django session    → 8 hours idle → must re-authenticate to Django
+Timer 2: Keycloak session  → set in Keycloak admin → must re-enter password
+
+MOBILE APP USER
+───────────────
+Opens app → logs in through Django API → receives JWT tokens
+
+Timer 3: Access token      → 30 minutes → app silently refreshes
+Timer 4: Refresh token     → 1 day → must log in again
+```
+
+**What you are probably seeing:**
+- **After a few hours away** → Django session expired (Timer 1, 8 hours)
+- **Asked to type password on Keycloak's page specifically** → Keycloak session expired (Timer 2)
+- **Mobile app shows login screen after a day** → Refresh token expired
+- **Quickly after switching tabs** → Not a timeout — likely your browser lost the cookie, or you accidentally logged out
 
 ### Forgot password — How it works with Keycloak
 
@@ -3222,6 +3313,33 @@ Other Group's Developer:
 ```
 
 **The API is our contract with the world.** As long as the API keeps working the same way, other groups don't care what technology we use behind it.
+
+### Do our fixes and changes affect the mobile app too?
+
+This is an important question. The answer depends on WHAT we change:
+
+| Type of fix | Affects mobile? | Why |
+|---|---|---|
+| Changes to `AuditLog.objects.create()` or any model/database code | ✅ Yes automatically | Same Django code runs for both web and mobile requests |
+| Changes to API views in `api_views.py` | ✅ Yes | Mobile calls these directly — new endpoints appear immediately |
+| Adding new API filters (e.g., `?expired_this_month=true`) | ✅ Yes | Mobile can start using them right away |
+| Fixed IP address capture (`_get_client_ip()`) | ✅ Yes | Django doesn't care if request is from browser or Flutter |
+| Changes to web views in `views.py` | ❌ No | These render HTML that mobile never sees |
+| Changes to HTML templates (`.html` files) | ❌ No | Flutter has its own completely separate screens |
+| New sidebar links in `base.html` | ❌ No | Flutter sidebar is built separately in Dart code |
+| Changes to `settings.py` | ✅ Depends | Database, JWT, CORS settings affect all clients |
+
+**The general rule:** Every database change and API change automatically helps mobile. Every HTML/template change is web-only. This is the clean separation between your two clients (web browser and Flutter app).
+
+**Example — IP fix we added:**
+When a field clerk on their phone creates an asset, the request travels from the phone over the hotspot to Django. Django reads the IP address from that request using the same `_get_client_ip()` function — the phone's hotspot IP like `192.168.43.118` — and saves it to the audit log. You do NOT need to do anything in the Flutter code. It works automatically.
+
+**Why the audit trail is web-only (important for panel questions):**
+The audit trail is a governance and accountability feature designed for office-based administrators and auditors. Nobody performs a serious audit investigation from a phone screen. The mobile app is for field work — registering assets, checking stock, quick lookups. The detailed audit trail belongs on the web platform.
+
+If the panel asks "why is the detailed audit trail not on mobile?", say:
+
+> *"The audit trail is a governance feature for office-based administrators and auditors. The mobile application is designed for field officers doing operational work. Putting a full audit investigation interface on a small phone screen would be poor UX design and is outside the field officer's job scope. The same audit data is available to anyone who needs it through the web platform."*
 
 ---
 

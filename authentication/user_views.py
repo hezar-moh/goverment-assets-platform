@@ -304,6 +304,7 @@ def user_edit_view(request, user_id):
                 target_user=target_user,
                 old_value={"role": old_role, "ministry_schema": old_schema},
                 new_value={"role": role, "ministry_schema": ministry_schema},
+                request=request, 
             )
 
             messages.success(
@@ -392,6 +393,7 @@ def user_toggle_active_view(request, user_id):
         target_user=target_user,
         old_value={"is_active": old_status},
         new_value={"is_active": target_user.is_active},
+        request=request, 
     )
 
     messages.success(request, f"User '{target_user.username}' has been {action_word}.")
@@ -454,6 +456,7 @@ def user_reset_password_view(request, user_id):
                 target_user=target_user,
                 old_value={"password": "changed"},
                 new_value={"password": "reset by admin"},
+                request=request, 
             )
 
             messages.success(
@@ -471,24 +474,41 @@ def user_reset_password_view(request, user_id):
     )
 
 
-def _log_user_action(schema_name, editor, action, target_user, old_value, new_value):
-    """Write an audit log entry for user management. Skips if schema_name is None (no tenant schema to write to)."""
+def _log_user_action(schema_name, editor, action, target_user,
+                     old_value, new_value, request=None):
+    """
+    Write an audit log entry for user management actions.
+    
+    If schema_name is None (Super Admin acting on another Super Admin),
+    we skip the tenant schema log — those actions are captured by the
+    Super Admin audit log instead (see SuperAdminAuditLog).
+    """
     if not schema_name:
         return
     try:
         from organizations.models import AuditLog
         from django_tenants.utils import schema_context
 
+        ip_address = None
+        user_agent = ''
+        if request is not None:
+            from authentication.views import get_client_ip
+            ip_address = get_client_ip(request)
+            user_agent = request.META.get('HTTP_USER_AGENT', '')[:500]
+
         with schema_context(schema_name):
             AuditLog.objects.create(
                 performed_by_id=editor.id,
                 performed_by_name=editor.get_full_name() or editor.username,
+                performed_by_role=editor.role,        # ← NEW
                 action=action,
                 model_name="CustomUser",
                 object_id=str(target_user.id),
                 object_repr=str(target_user),
                 old_value=old_value,
                 new_value=new_value,
+                ip_address=ip_address,
+                user_agent=user_agent,
             )
     except Exception:
         pass

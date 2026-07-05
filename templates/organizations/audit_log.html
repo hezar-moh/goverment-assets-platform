@@ -26,6 +26,7 @@
 
 <div class="filter-bar">
   <form method="get" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;width:100%;">
+
     <div class="filter-group">
       <label>Filter by Action</label>
       <select name="action" class="form-select">
@@ -39,14 +40,64 @@
       </select>
     </div>
 
+    <!-- NEW -->
+    <div class="filter-group">
+      <label>Performed By</label>
+      <select name="performed_by" class="form-select">
+        <option value="">All Users</option>
+        {% for uname in available_users %}
+        <option value="{{ uname }}"
+            {% if user_filter == uname %}selected{% endif %}>
+            {{ uname }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- NEW -->
+    <div class="filter-group">
+      <label>Module</label>
+      <select name="module" class="form-select">
+        <option value="">All Modules</option>
+        {% for mod in available_modules %}
+        <option value="{{ mod }}"
+            {% if module_filter == mod %}selected{% endif %}>
+            {{ mod }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- NEW -->
+    <div class="filter-group">
+      <label>Date From</label>
+      <input
+          type="date"
+          name="date_from"
+          value="{{ date_from }}"
+          class="form-control">
+    </div>
+
+    <!-- NEW -->
+    <div class="filter-group">
+      <label>Date To</label>
+      <input
+          type="date"
+          name="date_to"
+          value="{{ date_to }}"
+          class="form-control">
+    </div>
+
     <div style="display:flex;gap:8px;">
       <button type="submit" class="btn btn-primary btn-sm">
         <i class="bi bi-funnel-fill"></i> Filter
       </button>
+
       <a href="{% url 'audit_log' %}" class="btn btn-outline btn-sm">
         <i class="bi bi-x"></i> Clear
       </a>
     </div>
+
   </form>
 </div>
 

@@ -559,13 +559,18 @@ def asset_delete_view(request, asset_id):
     return redirect("asset_list")
 
 
-def _log_asset_action(schema_name, user, action, asset, old_value, request=None):
-    """
-    Write an audit log entry for asset create/update/delete. Shared by all views so the logic stays in one place.
+def _get_client_ip(request):
+    """Extract real client IP — checks proxy headers first."""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0].strip()
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
 
-    The 'request' parameter is optional so old call sites don't break
-    immediately, but should always be passed so the IP address is captured.
-    """
+
+def _log_asset_action(schema_name, user, action, asset, old_value, request=None):
+    """Write an audit log entry for asset create/update/delete."""
     try:
         from organizations.models import AuditLog
 
@@ -573,31 +578,30 @@ def _log_asset_action(schema_name, user, action, asset, old_value, request=None)
         if action != "DELETE":
             new_value = {
                 "asset_number": asset.asset_number,
-                "name": asset.name,
-                "status": asset.status,
-                "condition": asset.condition,
+                "name":         asset.name,
+                "status":       asset.status,
+                "condition":    asset.condition,
             }
 
-        # Extract IP and user agent from the request if available
         ip_address = None
-        user_agent = ""
+        user_agent = ''
         if request is not None:
             ip_address = _get_client_ip(request)
-            user_agent = request.META.get("HTTP_USER_AGENT", "")[:500]
+            user_agent = request.META.get('HTTP_USER_AGENT', '')[:500]
 
         with schema_context(schema_name):
             AuditLog.objects.create(
                 performed_by_id=user.id,
                 performed_by_name=user.get_full_name() or user.username,
+                performed_by_role=user.role,          # ← NEW
                 action=action,
                 model_name="Asset",
                 object_id=str(asset.id),
                 object_repr=str(asset),
                 old_value=old_value,
                 new_value=new_value,
-                ip_address=ip_address,  # ← NOW captured
-                user_agent=user_agent,  # ← NOW captured
+                ip_address=ip_address,
+                user_agent=user_agent,
             )
     except Exception:
-        # Never block the main action because audit logging failed
         pass
