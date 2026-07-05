@@ -1,6 +1,7 @@
-{% extends 'shared/base.html' %} {% block title %}Audit Trail — GovAsset{%
-endblock %} {% block page_heading %}Audit Trail{% endblock %} {% block content
-%}
+{% extends 'shared/base.html' %}
+{% block title %}Audit Trail — GovAsset{% endblock %}
+{% block page_heading %}Audit Trail{% endblock %}
+{% block content %}
 <div class="page-header">
   <div>
     <h4>Audit Trail</h4>
@@ -45,76 +46,22 @@ endblock %} {% block page_heading %}Audit Trail{% endblock %} {% block content
       <label>Filter by Action</label>
       <select name="action" class="form-select">
         <option value="">All Actions</option>
-        <option
-          value="CREATE"
-          {%
-          if
-          action_filter=""
-          ="CREATE"
-          %}selected{%
-          endif
-          %}
-        >
+        <option value="CREATE" {% if action_filter == "CREATE" %}selected{% endif %}>
           Create
         </option>
-        <option
-          value="UPDATE"
-          {%
-          if
-          action_filter=""
-          ="UPDATE"
-          %}selected{%
-          endif
-          %}
-        >
+        <option value="UPDATE" {% if action_filter == "UPDATE" %}selected{% endif %}>
           Update
         </option>
-        <option
-          value="DELETE"
-          {%
-          if
-          action_filter=""
-          ="DELETE"
-          %}selected{%
-          endif
-          %}
-        >
+        <option value="DELETE" {% if action_filter == "DELETE" %}selected{% endif %}>
           Delete
         </option>
-        <option
-          value="LOGIN"
-          {%
-          if
-          action_filter=""
-          ="LOGIN"
-          %}selected{%
-          endif
-          %}
-        >
+        <option value="LOGIN" {% if action_filter == "LOGIN" %}selected{% endif %}>
           Login
         </option>
-        <option
-          value="LOGOUT"
-          {%
-          if
-          action_filter=""
-          ="LOGOUT"
-          %}selected{%
-          endif
-          %}
-        >
+        <option value="LOGOUT" {% if action_filter == "LOGOUT" %}selected{% endif %}>
           Logout
         </option>
-        <option
-          value="ACCESS_DENIED"
-          {%
-          if
-          action_filter=""
-          ="ACCESS_DENIED"
-          %}selected{%
-          endif
-          %}
-        >
+        <option value="ACCESS_DENIED" {% if action_filter == "ACCESS_DENIED" %}selected{% endif %}>
           Access Denied
         </option>
       </select>
@@ -125,16 +72,7 @@ endblock %} {% block page_heading %}Audit Trail{% endblock %} {% block content
       <select name="performed_by" class="form-select">
         <option value="">All Users</option>
         {% for uname in available_users %}
-        <option
-          value="{{ uname }}"
-          {%
-          if
-          user_filter=""
-          ="uname"
-          %}selected{%
-          endif
-          %}
-        >
+        <option value="{{ uname }}" {% if user_filter == uname %}selected{% endif %}>
           {{ uname }}
         </option>
         {% endfor %}
@@ -159,16 +97,7 @@ endblock %} {% block page_heading %}Audit Trail{% endblock %} {% block content
       <select name="module" class="form-select">
         <option value="">All Modules</option>
         {% for mod in available_modules %}
-        <option
-          value="{{ mod }}"
-          {%
-          if
-          module_filter=""
-          ="mod"
-          %}selected{%
-          endif
-          %}
-        >
+        <option value="{{ mod }}" {% if module_filter == mod %}selected{% endif %}>
           {{ mod }}
         </option>
         {% endfor %}
@@ -326,4 +255,5 @@ endblock %} {% block page_heading %}Audit Trail{% endblock %} {% block content
   {% if page %} {% include 'shared/pagination.html' %} {% endif %}
 </div>
 
-{% endif %} {% endblock %}
+{% endif %}
+{% endblock %}

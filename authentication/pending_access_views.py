@@ -57,36 +57,36 @@ def pending_access_review_view(request, request_id):
         pending.review_notes    = review_notes
         pending.save()
 
-    try:
-        from authentication.models import SuperAdminAuditLog
-        from authentication.views import get_client_ip
+        try:
+            from authentication.models import SuperAdminAuditLog
+            from authentication.views import get_client_ip
 
-        log_action = (
-            'PENDING_APPROVED' if action == 'APPROVE'
-            else 'PENDING_REJECTED'
-        )
+            log_action = (
+                'PENDING_APPROVED' if action == 'APPROVE'
+                else 'PENDING_REJECTED'
+            )
 
-        SuperAdminAuditLog.objects.create(
-            performed_by_id=reviewer.id,
-            performed_by_name=reviewer.get_full_name() or reviewer.username,
-            performed_by_role=reviewer.role,
-            action=log_action,
-            description=(
-                f"{reviewer.get_full_name() or reviewer.username} "
-                f"{'approved' if action == 'APPROVE' else 'rejected'} "
-                f"access request from '{pending.username}'"
-            ),
-            target_username=pending.username,
-            old_value={'status': 'PENDING'},
-            new_value={
-                'status':       pending.status,
-                'review_notes': review_notes,
-            },
-            ip_address=get_client_ip(request),
-            user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
-        )
-    except Exception:
-        pass
+            SuperAdminAuditLog.objects.create(
+                performed_by_id=reviewer.id,
+                performed_by_name=reviewer.get_full_name() or reviewer.username,
+                performed_by_role=reviewer.role,
+                action=log_action,
+                description=(
+                    f"{reviewer.get_full_name() or reviewer.username} "
+                    f"{'approved' if action == 'APPROVE' else 'rejected'} "
+                    f"access request from '{pending.username}'"
+                ),
+                target_username=pending.username,
+                old_value={'status': 'PENDING'},
+                new_value={
+                    'status':       pending.status,
+                    'review_notes': review_notes,
+                },
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+            )
+        except Exception:
+            pass
 
         action_word = "approved" if action == 'APPROVE' else "rejected"
         messages.success(
