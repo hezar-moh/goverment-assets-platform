@@ -78,6 +78,10 @@ class PendingAccess(models.Model):
     keycloak_id = models.CharField(
         max_length=100, blank=True, help_text="Keycloak user ID if SSO was used"
     )
+    ministry_schema = models.CharField(
+        max_length=63, blank=True,
+        help_text="Which ministry schema this user was trying to access"
+    )
 
     # When and where
     attempted_at = models.DateTimeField(auto_now_add=True)

@@ -88,6 +88,35 @@ def pending_access_review_view(request, request_id):
         except Exception:
             pass
 
+        # Also log to the ministry's own audit trail so Ministry Admin can see it
+        if reviewer.ministry_schema:
+            try:
+                from organizations.models import AuditLog
+                from django_tenants.utils import schema_context
+
+                action_word = 'approved' if action == 'APPROVE' else 'rejected'
+                notes_display = review_notes if review_notes else f"Auto-{action_word} by {reviewer.get_full_name() or reviewer.username}"
+
+                with schema_context(reviewer.ministry_schema):
+                    AuditLog.objects.create(
+                        performed_by_id=reviewer.id,
+                        performed_by_name=reviewer.get_full_name() or reviewer.username,
+                        performed_by_role=reviewer.role,
+                        action='PENDING_APPROVED' if action == 'APPROVE' else 'PENDING_REJECTED',
+                        model_name='PendingAccess',
+                        object_id=str(pending.id),
+                        object_repr=f"{pending.username} → {action_word.upper()} ({review_notes or 'No notes'})",
+                        old_value={'status': 'PENDING'},
+                        new_value={
+                            'status':       pending.status,
+                            'review_notes': notes_display,
+                        },
+                        ip_address=get_client_ip(request),
+                        user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+                    )
+            except Exception:
+                pass
+
         action_word = "approved" if action == 'APPROVE' else "rejected"
         messages.success(
             request,

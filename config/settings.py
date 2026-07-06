@@ -21,6 +21,7 @@ ALLOWED_HOSTS = [
     '192.168.100.18',  # my laptop WiFi IP for mobile access
     '172.16.20.232',
     '10.187.165.150',
+    '10.103.10.150', # my laptop WiFi IP for mobile access
 ]
 
 SHARED_APPS = [
@@ -59,7 +60,7 @@ TENANT_DOMAIN_MODEL = "tenants.Domain"
 SHOW_PUBLIC_IF_NO_TENANT_FOUND = True
 
 
-# TenantMainMiddleware must be first — switches to the correct tenant schema
+# TenantMainMiddleware must be first  switches to the correct tenant schema
 MIDDLEWARE = [
     'django_tenants.middleware.main.TenantMainMiddleware',
     'django.middleware.security.SecurityMiddleware',

@@ -1,0 +1,8 @@
+///////commands////////
+
+Start Keycloak: cd C:\keycloak\keycloak-26.6.2\bin then kc.bat start-dev --http-port=8180
+
+localhost:8180  this is keycloak admin page
+
+http://0.0.0.0:8000/ 
+python manage.py setup_demo_data

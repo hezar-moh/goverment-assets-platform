@@ -44,14 +44,28 @@ class GovAssetOIDCBackend(OIDCAuthenticationBackend):
         email = claims.get('email', '')
         full_name = claims.get('name', '')
         keycloak_id = claims.get('sub', '')
+        ministry_schema = claims.get('ministry_schema', '')
 
         logger.warning(f"OIDC: No Django user found for Keycloak user: {username}. Access blocked.")
 
         try:
             from authentication.models import PendingAccess
+            ip_address = ''
+            user_agent = ''
+            if self.request is not None:
+                x_forwarded = self.request.META.get('HTTP_X_FORWARDED_FOR')
+                if x_forwarded:
+                    ip_address = x_forwarded.split(',')[0].strip()
+                else:
+                    ip_address = self.request.META.get('REMOTE_ADDR', '')
+                user_agent = self.request.META.get('HTTP_USER_AGENT', '')[:500]
+
             PendingAccess.objects.create(
                 username=username, email=email or '',
-                full_name=full_name or '', keycloak_id=keycloak_id, status='PENDING',
+                full_name=full_name or '', keycloak_id=keycloak_id,
+                ministry_schema=ministry_schema, status='PENDING',
+                ip_address=ip_address or None,
+                user_agent=user_agent,
             )
         except Exception as e:
             logger.error(f"OIDC: Failed to create PendingAccess: {e}")

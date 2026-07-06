@@ -100,6 +100,8 @@ class AuditLog(models.Model):
         ("LOGIN", "Login"),
         ("LOGOUT", "Logout"),
         ("ACCESS_DENIED", "Access Denied"),
+        ("PENDING_APPROVED", "Pending Access Approved"),
+        ("PENDING_REJECTED", "Pending Access Rejected"),
     ]
 
     performed_by_id = models.IntegerField(

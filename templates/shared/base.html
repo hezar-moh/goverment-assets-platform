@@ -37,13 +37,11 @@
       <i class="bi bi-grid-1x2-fill"></i> Dashboard
     </a>
 
-    {% if user.role != 'AUDITOR' %}
     <div class="sidebar-section-label">Assets</div>
     <a href="{% url 'asset_list' %}"
        class="sidebar-link {% if 'asset' in request.resolver_match.url_name|default:'' %}active{% endif %}">
       <i class="bi bi-box-seam-fill"></i> Asset Register
     </a>
-    {% endif %}
 
     {% if user.role == 'SUPER_ADMIN' or user.role == 'MINISTRY_ADMIN' or user.role == 'AGENCY_MANAGER' %}
     <div class="sidebar-section-label">Administration</div>
