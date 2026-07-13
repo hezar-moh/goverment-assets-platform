@@ -8,16 +8,8 @@ http://0.0.0.0:8000/
 python manage.py runserver 0.0.0.0:8000
 python manage.py setup_demo_data
 
-/// ngrok — both tunnels in one terminal ///
+we dont use ngrok instead we now use railway for hosting all
 
-1. Start both servers:
-   - python manage.py runserver 0.0.0.0:8000
-   - kc.bat start-dev --http-port=8180
+so in rawilwaye we never use python manage.py runserver we use gunicorn
 
-2. In a 3rd terminal:
-   ngrok start --all
-
-Both URLs appear in the same output.
-
-Config file location:
-C:\Users\Hemed\AppData\Local\Packages\ngrok.ngrok_1g87z0zv29zzc\LocalCache\Local\ngrok\ngrok.yml
+db url in railway => postgresql://postgres:cogYGmtAfZIcLjPjZQVCCBtgGKAlUoaZ@tokaido.proxy.rlwy.net:30290/railway

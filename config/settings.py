@@ -4,6 +4,7 @@ Uses django-tenants for multi-ministry schemas, Keycloak OIDC for SSO,
 DRF for REST APIs, and SimpleJWT for token authentication.
 """
 from pathlib import Path
+from urllib.parse import urlparse
 from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -102,16 +103,31 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 # Uses django_tenants.postgresql_backend for schema-based multi-tenancy
-DATABASES = {
-    'default': {
-        'ENGINE': 'django_tenants.postgresql_backend',
-        'NAME': config('DB_NAME'),
-        'USER': config('DB_USER'),
-        'PASSWORD': config('DB_PASSWORD'),
-        'HOST': config('DB_HOST'),
-        'PORT': config('DB_PORT', cast=int),
+# Supports DATABASE_URL (Railway default) or individual DB_* variables
+DATABASE_URL = config('DATABASE_URL', default=None)
+if DATABASE_URL:
+    parsed = urlparse(DATABASE_URL)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django_tenants.postgresql_backend',
+            'NAME': parsed.path.lstrip('/'),
+            'USER': parsed.username,
+            'PASSWORD': parsed.password,
+            'HOST': parsed.hostname,
+            'PORT': parsed.port,
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django_tenants.postgresql_backend',
+            'NAME': config('DB_NAME'),
+            'USER': config('DB_USER'),
+            'PASSWORD': config('DB_PASSWORD'),
+            'HOST': config('DB_HOST'),
+            'PORT': config('DB_PORT', cast=int),
+        }
+    }
 DATABASE_ROUTERS = (
     'django_tenants.routers.TenantSyncRouter',
 )
