@@ -176,6 +176,7 @@ USE_TZ = True
 # Session and auth settings
 LOGIN_URL          = '/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
+PLATFORM_BASE_URL = config('PLATFORM_BASE_URL', default='http://localhost:8000')
 LOGOUT_REDIRECT_URL = '/login/'
 
 # Session expires when browser closes

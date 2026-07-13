@@ -93,9 +93,10 @@ def logout_view(request):
     logout(request)
 
     from django.conf import settings
+    platform_base = getattr(settings, 'PLATFORM_BASE_URL', 'http://localhost:8000')
     keycloak_logout_url = (
         f"{settings.OIDC_OP_LOGOUT_ENDPOINT}"
-        f"?post_logout_redirect_uri=http://localhost:8000/login/"
+        f"?post_logout_redirect_uri={platform_base}/login/"
         f"&client_id={settings.OIDC_RP_CLIENT_ID}"
     )
     return redirect(keycloak_logout_url)
