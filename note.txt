@@ -13,3 +13,11 @@ we dont use ngrok instead we now use railway for hosting all
 so in rawilwaye we never use python manage.py runserver we use gunicorn
 
 db url in railway => postgresql://postgres:cogYGmtAfZIcLjPjZQVCCBtgGKAlUoaZ@tokaido.proxy.rlwy.net:30290/railway
+
+The Swagger page is blank because DEBUG=False stops Django from serving static files. Need to add whitenoise to fix this.
+
+keycloak url publick in railway is keycloak-production-4f96.up.railway.app
+
+
+below is client secret which we will use for Django in our railway
+duXEGfbMfBppvG2LD3bV8Fc4wCfSVY7l

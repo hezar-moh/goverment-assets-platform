@@ -25,6 +25,10 @@ ALLOWED_HOSTS = [
     '10.103.10.150', # my laptop WiFi IP for mobile access
     '.ngrok-free.dev',  # For testing with ngrok
 ]
+
+# Railway terminates HTTPS at edge, forwards HTTP internally
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 # In production (Railway), this is set via env var to allow .up.railway.app
 if config('ALLOWED_HOSTS', default=None):
     ALLOWED_HOSTS = config('ALLOWED_HOSTS').split(',')
