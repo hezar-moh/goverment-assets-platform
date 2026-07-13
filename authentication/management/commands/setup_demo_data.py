@@ -1,3 +1,4 @@
+from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django_tenants.utils import schema_context
@@ -90,12 +91,47 @@ class Command(BaseCommand):
 
     def _seed_data(self):
         self.stdout.write('\nSeeding demo data...')
+        self._seed_ministries()
+        self._run_tenant_migrations()
         self._seed_categories()
         self._seed_org_units()
         self._seed_users()
         self._seed_moh_data()
         self._seed_mof_data()
         self.stdout.write(self.style.SUCCESS('  Seeding complete.'))
+
+    def _run_tenant_migrations(self):
+        """Create tables in tenant schemas (required after new ministry creation)."""
+        self.stdout.write('  Running tenant migrations...')
+        call_command('migrate_schemas', verbosity=0)
+        self.stdout.write('  [OK] Tenant migrations complete')
+
+    def _seed_ministries(self):
+        """Create ministry schemas if they don't exist (idempotent)."""
+        from tenants.models import Ministry, Domain
+        ministries_data = [
+            {'name': 'Ministry of Health', 'schema_name': 'moh_schema', 'domain': 'moh.localhost'},
+            {'name': 'Ministry of Finance', 'schema_name': 'mof_schema', 'domain': 'mof.localhost'},
+        ]
+        created = 0
+        for data in ministries_data:
+            ministry, is_new = Ministry.objects.get_or_create(
+                schema_name=data['schema_name'],
+                defaults={'name': data['name']}
+            )
+            if is_new:
+                Domain.objects.get_or_create(
+                    domain=data['domain'],
+                    defaults={
+                        'tenant': ministry,
+                        'is_primary': True,
+                    }
+                )
+                created += 1
+        if created:
+            self.stdout.write(f'  [OK] Created {created} ministry schemas')
+        else:
+            self.stdout.write(f'  [OK] Ministries already exist')
 
     def _seed_categories(self):
         """Create asset categories in every tenant schema (idempotent)."""
