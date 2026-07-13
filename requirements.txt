@@ -2,6 +2,7 @@ django
 django-tenants
 djangorestframework
 gunicorn
+whitenoise
 djangorestframework-simplejwt
 mozilla-django-oidc
 django-cors-headers
