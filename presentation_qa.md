@@ -30,7 +30,7 @@
 | 9 | [Database Design](#part-9) | Public schema vs tenant schemas, why not one table |
 | 21 | [Database Deep Dive](#part-21) | All tables, columns, shared vs private explained |
 | | **INTEGRATION** | |
-| 13 | [Integration With Other Groups](#part-13) | How they call our API, ngrok guide, WhatsApp message template, FAQ |
+| 13 | [Integration With Other Groups](#part-13) | How they call our API, Railway deployment, WhatsApp message template, FAQ |
 | 14 | [Why Each Ministry Needs a Domain](#part-14) | Why not just use /ministry/1/ in the URL |
 | 26 | [The Full 10-Group Project](#part-26) | Structure, Group 1's role, dependency matrix |
 | | **DEPLOYMENT & SETUP** | |
@@ -47,6 +47,7 @@
 | 27 | [Tonight & Tomorrow Checklist](#part-27) | What to do before the panel |
 | 28 | [Defense Strategies](#part-28) | What If scenarios — crash, freeze, missing features |
 | 29 | [Confidence Tips](#part-29) | Posture, eye contact, voice, recovery |
+| 30 | [Deployment Guide](#part-30) | Full Railway setup, every change explained, database, reset, Keycloak, mobile |
 
 ---
 
@@ -2723,8 +2724,8 @@ OTHER GROUP'S LAPTOP (Group 2-10):
 
 **What if we are on different WiFi?** We cannot access each other. We would need to either:
 1. Both connect to the same WiFi (college network)
-2. Use a tool like ngrok (gives us a public URL that forwards to our laptop)
-3. Deploy to a cloud server (production mode)
+2. Deploy to Railway (permanent URLs, described below)
+3. Use a cloud server (VPS)
 
 ### Complete example: A group wants to integrate with us from scratch
 
@@ -3034,39 +3035,6 @@ For each client in Keycloak:
 
 ---
 
-#### Fallback — ngrok for quick local testing (before Railway deployment)
-
-If you haven't deployed to Railway yet and need to test immediately, use ngrok. Note that **free ngrok only supports one tunnel** — you need two different tunneling tools for both services.
-
-**Option A — ngrok for Keycloak + bore/localtunnel for Django:**
-
-```
-Terminal 1: python manage.py runserver 0.0.0.0:8000
-Terminal 2: kc.bat start-dev --http-port=8180
-Terminal 3: ngrok http 8180                     → https://keycloak.ngrok-free.app
-Terminal 4: bore local 8000 --to bore.pub       → https://bore.pub:12345 (Django)
-```
-
-Install bore: download exe from https://github.com/ekzhang/bore/releases
-
-**Option B — Two separate ngrok binaries (different accounts):**
-```
-Terminal 3: ngrok http 8000   (MSIX store version)
-Terminal 4: C:\ngrok-cli\ngrok.exe http 8180  (standalone, 2nd account)
-```
-
-**Limitations of ngrok:**
-- URLs change every restart → must re-share with Group 2
-- Only one tunnel per ngrok instance on free plan
-- Your laptop must stay on for anyone to access
-
-**Hotspot (if groups are nearby):**
-```powershell
-python manage.py runserver 0.0.0.0:8000
-ipconfig  # Find your IP: 192.168.x.x
-# Share: http://192.168.x.x:8000/api/docs
-```
-
 #### Step 3: Share this exact message on WhatsApp / Email
 
 Copy and send this to your groups 2-10 group:
@@ -3134,14 +3102,14 @@ Every language can make HTTP requests. Here is the Python example (they translat
 import requests
 
 # Step 1: Login
-resp = requests.post('https://a1b2c3d4.ngrok-free.app/api/auth/login/', json={
+resp = requests.post('https://goverment-assets-platform-production.up.railway.app/api/auth/login/', json={
     'username': 'moh_admin',
     'password': 'Admin@123'
 })
 token = resp.json()['access']
 
 # Step 2: Verify token
-resp = requests.get('https://a1b2c3d4.ngrok-free.app/api/auth/verify-token/', headers={
+resp = requests.get('https://goverment-assets-platform-production.up.railway.app/api/auth/verify-token/', headers={
     'Authorization': f'Bearer {token}'
 })
 user = resp.json()['user']
@@ -3191,22 +3159,15 @@ Group 2 cannot access `localhost:8000` or `localhost:8180` from their computer. 
 | Option | Cost | Setup Time | URL Changes? | Best For |
 |--------|------|------------|-------------|----------|
 | **Railway** | Free tier | 2-3 hours | **No — permanent** | Recommended for integration |
-| **ngrok** | Free | 10 minutes | Yes — every restart | Quick local testing only |
-| **DigitalOcean / Linode** | $6-12/month | 3-4 hours | No — permanent | Full production demo |
+| **Railway** | Free tier | 2-3 hours | **No — permanent** | Recommended |
+| **VPS (DigitalOcean/Linode)** | $6-12/month | 3-4 hours | No — permanent | Full production |
 
-**Option 1 — Railway (RECOMMENDED — permanent URLs, 24/7 uptime)**
+**Recommended — Railway (permanent URLs, 24/7 uptime)**
 
-Deploy both Django + Keycloak to Railway. Both get permanent URLs that never change. Group 2 configures once and never updates. Your laptop can be off. Full step-by-step instructions are in the "Step-by-Step" section above.
+This is what we deployed to. Both Django + Keycloak run on Railway with permanent URLs that never change. Group 2 configures once and never updates. Your laptop can be off. See Part 30 for the complete step-by-step.
 
 **Pros:** Permanent URLs, 24/7 uptime, free tier, laptop can be off, PostgreSQL included.
 **Cons:** 30-45 minute setup time (one time only).
-
-**Option 2 — ngrok (fallback for quick local testing only)**
-
-ngrok creates temporary public URLs that tunnel to your localhost. Free plan only supports one tunnel at a time. Documented in the "Step 2 Fallback" section above.
-
-**Pros:** Works immediately, no hosting setup.
-**Cons:** URLs change every restart. Laptop must stay on.
 
 **Option 3 — VPS (if you want full control)**
 
@@ -4209,10 +4170,9 @@ Web developer runs: ipconfig
 → They cannot connect directly
 → Solutions:
   a) Both join the same WiFi (college network, cafe, etc.)
-  b) Web developer uses ngrok (creates a public URL):
-       ngrok http 8000
-       → Gives: https://abc123.ngrok.io
-       → Mobile uses that URL instead
+  b) Deploy to Railway (permanent URL):
+       https://goverment-assets-platform-production.up.railway.app
+       → Both developers use this URL
   c) Deploy Django to a temporary cloud server
 ```
 
@@ -6145,3 +6105,724 @@ The panel has not read a 4,700-line guide. They have a rubric. You have deep kno
 Now close this file. Stand up. Walk to the mirror. Say the one-paragraph answer from Part 19 out loud. Do it three times. Then sleep.
 
 You have got this.
+
+---
+
+<a name="part-30"></a>
+## PART 30: COMPLETE DEPLOYMENT GUIDE — From Localhost to Railway
+
+> **This part covers:** Everything that changed when we moved from localhost to Railway.  
+> Read this if you need to understand the full deployment, reset the database, go back to localhost, or explain the architecture to the panel.
+
+### 30.1 What Did We Deploy? (Three Services)
+
+We deployed THREE services on Railway:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    RAILWAY PROJECT "govasset"                     │
+│                                                                   │
+│  ┌──────────────────────┐    ┌──────────────────────────────────┐ │
+│  │                      │    │                                  │ │
+│  │  SERVICE 1: Django   │    │  SERVICE 2: Keycloak (Docker)    │ │
+│  │                      │    │                                  │ │
+│  │  URL:                │    │  URL:                            │ │
+│  │  goverment-assets-   │    │  keycloak-production-4f96        │ │
+│  │  platform-production │    │  .up.railway.app                 │ │
+│  │  .up.railway.app     │    │                                  │ │
+│  │                      │    │  Port: 8080                      │ │
+│  │  Port: 8080          │    │  Image: quay.io/                │ │
+│  │  Framework: Django   │    │         keycloak/keycloak:26.1   │ │
+│  │  Server: gunicorn    │    │  Command: kc.sh start-dev       │ │
+│  │                      │    │                                  │ │
+│  └──────────┬───────────┘    └──────────┬───────────────────────┘ │
+│             │                           │                          │
+│             │    ┌──────────────────┐    │                          │
+│             │    │                  │    │                          │
+│             └───→│  SERVICE 3:      │←───┘                          │
+│                  │  PostgreSQL      │                               │
+│                  │  (Railway        │                               │
+│                  │   managed)       │                               │
+│                  │                  │                               │
+│                  │  Internal URL:   │                               │
+│                  │  postgres.       │                               │
+│                  │  railway.internal│                               │
+│                  │  :5432/railway   │                               │
+│                  └──────────────────┘                               │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Three services talking to each other:**
+
+| Connection | How it works |
+|-----------|-------------|
+| **Django → PostgreSQL** | Django connects via `DATABASE_URL` env var. Uses `django_tenants.postgresql_backend` for multi-schema support. |
+| **Keycloak → PostgreSQL** | Keycloak connects via `KC_DB_URL` (JDBC format). Stores realms, clients, users. |
+| **Django → Keycloak** | Django calls Keycloak's OIDC endpoints (`/auth`, `/token`, `/logout`) for SSO login/logout. Uses `KEYCLOAK_SERVER_URL` env var. |
+
+**On your local machine, the architecture was the same — just different URLs:**
+
+| Component | Localhost | Railway |
+|-----------|-----------|---------|
+| Django URL | `http://localhost:8000` | `https://goverment-assets-platform-production.up.railway.app` |
+| Keycloak URL | `http://localhost:8180` | `https://keycloak-production-4f96.up.railway.app` |
+| PostgreSQL | Local install | Railway managed |
+| Static files | Django built-in | Whitenoise |
+| Server | `runserver` | `gunicorn` |
+
+---
+
+### 30.2 Every Single Change We Made
+
+#### Change 1 — requirements.txt (added 2 packages)
+
+**Before:**
+```
+django, django-tenants, djangorestframework, ...
+```
+
+**After:**
+```
+gunicorn       ← Added: Production server (replaces runserver)
+whitenoise     ← Added: Serves static files when DEBUG=False
+```
+
+**Why gunicorn?** Django's `runserver` is for development only — it is single-threaded and insecure. Gunicorn is a production-grade WSGI server that handles multiple requests simultaneously.
+
+**Why whitenoise?** When `DEBUG=False`, Django stops serving static files. Whitenoise serves them efficiently in production. Without it, the Swagger page and admin panel appear as blank pages.
+
+---
+
+#### Change 2 — settings.py: ALLOWED_HOSTS became dynamic
+
+**Before:**
+```python
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    '.localhost',
+    '192.168.100.18',
+    ...
+]
+```
+
+**After (added):**
+```python
+if config('ALLOWED_HOSTS', default=None):
+    ALLOWED_HOSTS = config('ALLOWED_HOSTS').split(',')
+```
+
+**Why?** Railway gives us a URL like `goverment-assets-platform-production.up.railway.app`. We cannot hardcode this because Railway generates random subdomains. Instead, we set `ALLOWED_HOSTS=.up.railway.app` as an env var — the wildcard `.` prefix matches any Railway subdomain.
+
+**Localhost impact:** This code only runs if the `ALLOWED_HOSTS` env var is set. On your laptop, it's not set, so the old hardcoded list still applies. No impact.
+
+---
+
+#### Change 3 — settings.py: Added SECURE_PROXY_SSL_HEADER
+
+**Added:**
+```python
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+```
+
+**Why?** Railway terminates HTTPS at its edge and forwards requests to Django as HTTP. Django thinks the request is HTTP and generates `http://` URLs for redirects. Keycloak rejects these because it expects `https://`. This header tells Django: "Trust the `X-Forwarded-Proto` header — if it says `https`, treat the request as secure."
+
+**Without this:** SSO login redirects fail. The user logs into Keycloak, but the redirect back to Django uses `http://` which doesn't match Keycloak's configured `https://` redirect URIs.
+
+**Localhost impact:** Your browser doesn't send `X-Forwarded-Proto`, so this setting has no effect on localhost. Safe.
+
+---
+
+#### Change 4 — settings.py: Added DATABASE_URL support
+
+**Before:**
+```python
+DATABASES = {
+    'default': {
+        'ENGINE': 'django_tenants.postgresql_backend',
+        'NAME': config('DB_NAME'),
+        'USER': config('DB_USER'),
+        'PASSWORD': config('DB_PASSWORD'),
+        'HOST': config('DB_HOST'),
+        'PORT': config('DB_PORT', cast=int),
+    }
+}
+```
+
+**After:**
+```python
+DATABASE_URL = config('DATABASE_URL', default=None)
+if DATABASE_URL:
+    from urllib.parse import urlparse
+    parsed = urlparse(DATABASE_URL)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django_tenants.postgresql_backend',
+            'NAME': parsed.path.lstrip('/'),
+            'USER': parsed.username,
+            'PASSWORD': parsed.password,
+            'HOST': parsed.hostname,
+            'PORT': parsed.port,
+        }
+    }
+else:
+    # Original code using DB_NAME, DB_USER, etc.
+```
+
+**Why?** Railway auto-generates a `DATABASE_URL` when you add PostgreSQL. It looks like: `postgresql://postgres:abc123@containers-us-west-xxx.railway.app:5432/railway`. Instead of manually extracting the username, password, host, port, database name and setting 5 separate env vars, we can just set one: `DATABASE_URL`. The code parses it automatically using Python's built-in `urlparse`.
+
+**Localhost impact:** On your laptop, `DATABASE_URL` is not set, so the `else` branch runs with your existing `DB_NAME`, `DB_USER`, etc. No impact.
+
+---
+
+#### Change 5 — settings.py: Added PLATFORM_BASE_URL
+
+**Added:**
+```python
+PLATFORM_BASE_URL = config('PLATFORM_BASE_URL', default='http://localhost:8000')
+```
+
+**Why?** The logout code was hardcoded to redirect to `http://localhost:8000/login/`. On Railway, this would send the user to localhost (which doesn't exist). Now it reads from `PLATFORM_BASE_URL` env var.
+
+**Localhost impact:** `PLATFORM_BASE_URL` is not set locally, so it defaults to `http://localhost:8000` — same as before. No impact.
+
+---
+
+#### Change 6 — settings.py: Added whitenoise middleware
+
+**Before:**
+```python
+MIDDLEWARE = [
+    'django_tenants.middleware.main.TenantMainMiddleware',
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    ...
+]
+```
+
+**After:**
+```python
+MIDDLEWARE = [
+    'django_tenants.middleware.main.TenantMainMiddleware',
+    'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',     # ← Added
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    ...
+]
+```
+
+**Why?** Whitenoise serves static files (CSS, JS, images) in production. When `DEBUG=False`, Django does not serve static files automatically. Without whitenoise, the Swagger page, admin panel, and login page load without styling — appearing as blank or unstyled pages.
+
+**Localhost impact:** Whitenoise works on localhost too — no harm, it just serves static files slightly faster.
+
+---
+
+#### Change 7 — views.py: Logout URL fix
+
+**Before (authentication/views.py line 98):**
+```python
+f"?post_logout_redirect_uri=http://localhost:8000/login/"
+```
+
+**After:**
+```python
+platform_base = getattr(settings, 'PLATFORM_BASE_URL', 'http://localhost:8000')
+f"?post_logout_redirect_uri={platform_base}/login/"
+```
+
+**Why?** The old code always redirected to `http://localhost:8000/login/` after logout. On Railway, this sends the user to a non-existent localhost page. Now it uses the `PLATFORM_BASE_URL` env var.
+
+**Localhost impact:** `PLATFORM_BASE_URL` defaults to `http://localhost:8000` when not set. Same behavior as before. No impact.
+
+---
+
+#### Change 8 — setup_demo_data.py: Added ministry creation + tenant migrations
+
+**Before:** The script assumed ministries (schemas) already existed. If they didn't (fresh database), it crashed with `relation "assets_assetcategory" does not exist`.
+
+**Added:**
+1. `_seed_ministries()` — Creates Ministry of Health + Ministry of Finance schemas (idempotent)
+2. `_run_tenant_migrations()` — Runs `migrate_schemas` after creating ministries (creates tables in tenant schemas)
+
+**Why?** On a fresh Railway PostgreSQL database, no ministries exist. The old code tried to create categories and org units in schemas that didn't exist yet.
+
+---
+
+### 30.3 Environment Variables — Complete Reference
+
+#### Django Railway Variables
+
+These are set in Railway Dashboard → Django Service → Variables tab:
+
+| Variable | Value | Why it's needed |
+|----------|-------|-----------------|
+| `DATABASE_URL` | `postgresql://postgres:...@postgres.railway.internal:5432/railway` | Django connects to Railway PostgreSQL |
+| `SECRET_KEY` | Random 50-char string | Django's cryptographic signing (sessions, CSRF, tokens) |
+| `ALLOWED_HOSTS` | `.up.railway.app` | Allows Railway's domain to serve Django |
+| `DEBUG` | `False` | Disables debug mode in production |
+| `KEYCLOAK_SERVER_URL` | `https://keycloak-production-4f96.up.railway.app` | Django talks to Railway's Keycloak |
+| `KEYCLOAK_CLIENT_ID` | `govasset-django` | OIDC client ID for SSO |
+| `KEYCLOAK_CLIENT_SECRET` | (the secret copied from Keycloak admin) | OIDC client secret for SSO |
+| `KEYCLOAK_ADMIN_USERNAME` | `admin` | Django connects to Keycloak admin API |
+| `KEYCLOAK_ADMIN_PASSWORD` | `Admin@123` | Keycloak admin password |
+| `PLATFORM_BASE_URL` | `https://goverment-assets-platform-production.up.railway.app` | Used in logout redirect and emails |
+| `CSRF_TRUSTED_ORIGINS` | (optional, for POST requests) | Prevents CSRF errors on Railway |
+
+**Variables that use their local defaults (not set on Railway):**
+
+| Variable | Local default | Why it's OK |
+|----------|--------------|-------------|
+| `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` | From your `.env` file | Not needed because `DATABASE_URL` is used instead |
+| `KEYCLOAK_REALM` | `govasset` | Same realm name on Railway |
+| `KEYCLOAK_CLIENT_ID` | `govasset-django` | Same client ID on Railway |
+
+#### Keycloak Railway Variables
+
+Set in Railway Dashboard → Keycloak Service → Variables tab:
+
+| Variable | Value | Why it's needed |
+|----------|-------|-----------------|
+| `KC_DB` | `postgres` | Tell Keycloak to use PostgreSQL (not default H2) |
+| `KC_DB_USERNAME` | `postgres` | PostgreSQL username |
+| `KC_DB_PASSWORD` | (from Railway PostgreSQL password) | PostgreSQL password |
+| `KC_DB_URL` | `jdbc:postgresql://postgres.railway.internal:5432/railway` | PostgreSQL JDBC connection string |
+| `KC_HOSTNAME` | `https://keycloak-production-4f96.up.railway.app` | Keycloak's public URL (required for proper redirects) |
+| `KC_PROXY` | `edge` | Required behind Railway's proxy — prevents redirect loops |
+| `KC_HOSTNAME_STRICT` | `false` | Allows Keycloak to work behind Railway's proxy |
+| `KEYCLOAK_ADMIN` | `admin` | Admin console username |
+| `KEYCLOAK_ADMIN_PASSWORD` | `Admin@123` | Admin console password |
+| `JAVA_OPTS_APPEND` | `-Xmx256m -Xms128m` | Limits Java memory (free tier only has 1GB) |
+
+**For the `KC_DB_URL` format:**
+
+Railway's `DATABASE_URL` looks like:
+```
+postgresql://postgres:abc123@postgres.railway.internal:5432/railway
+```
+
+The Keycloak JDBC URL must be:
+```
+jdbc:postgresql://postgres.railway.internal:5432/railway
+```
+
+Note: `postgresql://` becomes `jdbc:postgresql://` and the `username:password@` part is removed (set as separate `KC_DB_USERNAME` and `KC_DB_PASSWORD` variables instead).
+
+---
+
+### 30.4 The Database — Railway PostgreSQL
+
+#### How to Access Railway PostgreSQL
+
+**Method 1 — Through Railway dashboard:**
+1. In Railway → PostgreSQL service → **Connect** tab
+2. You'll see the connection details
+3. Use the **Web Terminal** button to open a SQL shell
+
+**Method 2 — Through Django terminal:**
+In Railway → Django service → **Connect** tab → **Web Terminal**:
+```bash
+python manage.py dbshell
+```
+This opens a PostgreSQL command line connected to the Railway database.
+
+**Method 3 — Through a desktop tool (pgAdmin, DBeaver):**
+Use the connection details from the Railway PostgreSQL service.
+
+#### Viewing Tables and Schemas
+
+In the Django web terminal:
+
+```bash
+# Connect to database
+python manage.py dbshell
+```
+
+Then run PostgreSQL commands:
+
+```sql
+-- List all schemas (public + tenant schemas)
+\dn
+
+-- You should see:
+--   public       ← Shared tables (users, tenants, etc.)
+--   moh_schema   ← Ministry of Health data
+--   mof_schema   ← Ministry of Finance data
+
+-- List tables in public schema
+\dt public.*
+
+-- List tables in moh_schema
+\dt moh_schema.*
+
+-- Count assets in each ministry
+SELECT COUNT(*) FROM moh_schema.assets_asset;
+SELECT COUNT(*) FROM mof_schema.assets_asset;
+
+-- List all users
+SELECT id, username, role, ministry_schema, is_active, is_locked
+FROM public.authentication_customuser;
+
+-- Quit
+\q
+```
+
+**What tables exist in each schema:**
+
+Public schema:
+- `tenants_ministry` — List of all ministries
+- `tenants_domain` — Domain-to-ministry mapping
+- `authentication_customuser` — All users from all ministries
+- `django_session` — Login sessions
+- `authentication_loginattempt` — Failed login tracking
+- `authentication_unlocktoken` — Password unlock tokens
+- `authentication_pendingaccess` — Users awaiting approval
+- `django_migrations` — Migration history
+- And Django admin/contenttypes/auth tables
+
+Each tenant schema (moh_schema, mof_schema):
+- `assets_asset` — Assets
+- `assets_assetcategory` — Asset categories
+- `organizations_orgunit` — Organization units
+- `organizations_masterdata` — Dropdown options
+- `organizations_auditlog` — Audit trail (tamper-proof)
+
+#### Resetting the Database (Fresh Start)
+
+If you need to delete ALL data and start fresh:
+
+```bash
+# In Railway Django terminal:
+
+# Step 1: Drop all tenant schemas
+python manage.py shell -c "
+from tenants.models import Ministry
+for m in Ministry.objects.all():
+    m.delete()
+    print(f'Deleted {m.schema_name}')
+"
+
+# Step 2: Delete all users
+python manage.py shell -c "
+from authentication.models import CustomUser
+CustomUser.objects.all().delete()
+print('All users deleted')
+"
+
+# Step 3: Re-run setup_demo_data
+python manage.py setup_demo_data
+
+# Step 4: Recreate 6 users in Railway Keycloak admin
+# (same manual process as before — Keycloak users are not created by setup_demo_data)
+```
+
+**Note:** The `setup_demo_data` command is idempotent — running it multiple times will clean old data and recreate it fresh.
+
+#### Important: Keycloak Database
+
+Currently, Railway Keycloak uses **H2 (in-memory database)** because the PostgreSQL connection failed initially. This means:
+
+| If this happens | What you lose |
+|----------------|--------------|
+| Keycloak restarts | All users, realm, clients — GONE |
+| Railway deploys Keycloak again | All Keycloak config — GONE |
+
+**To fix this permanently:** You need to switch Keycloak to use Railway's PostgreSQL. The variables are already set (`KC_DB`, `KC_DB_URL`), but the JDBC URL format might be wrong. Follow these steps:
+
+1. In Railway → Keycloak service → **Variables** tab
+2. Ensure these are set correctly:
+   - `KC_DB` = `postgres`
+   - `KC_DB_URL` = `jdbc:postgresql://postgres.railway.internal:5432/railway`
+   - `KC_DB_USERNAME` = `postgres`
+   - `KC_DB_PASSWORD` = (from Railway PostgreSQL variables)
+3. Change the **Start Command** from `start-dev` to:
+
+```
+/opt/keycloak/bin/kc.sh start --optimized
+```
+
+**Wait!** The `start` command needs more memory. The free Railway plan (1GB RAM) might not handle it. If it crashes, keep using `start-dev` with H2 and accept that Keycloak data is lost on restart. For a demo/presentation, this is acceptable — you recreate the realm and users if needed.
+
+---
+
+### 30.5 Security Settings — What Carries Over
+
+This is important. Django security settings are stored in **code** (settings.py, views.py), so they apply on Railway automatically. Keycloak security settings are stored in **Keycloak's database** (realms, client config), so they need to be configured separately on Railway Keycloak.
+
+| Security Feature | Where it's stored | Works on Railway? |
+|-----------------|------------------|-------------------|
+| **Brute force lockout (Django-side)** | `authentication/api_views.py` | ✅ Yes — automatically |
+| **3-stage progressive lockout** | Django settings + code | ✅ Yes — automatically |
+| **Email unlock** | Django views + email config | ✅ Yes (if email configured) |
+| **JWT token expiry (30 min)** | `settings.py` — `SIMPLE_JWT` | ✅ Yes — code is deployed |
+| **Session timeout (8 hours)** | `settings.py` — `SESSION_COOKIE_AGE` | ✅ Yes — code is deployed |
+| **Password validation** | `settings.py` — `AUTH_PASSWORD_VALIDATORS` | ✅ Yes — code is deployed |
+| **CORS settings** | `settings.py` — `CORS_*` | ✅ Yes — code is deployed |
+| **Audit log tamper-proof** | `organizations/models.py` | ✅ Yes — code is deployed |
+| **PendingAccess approval** | `authentication/oidc_backend.py` | ✅ Yes — code is deployed |
+| **Role-based access** | `authentication/decorators.py` | ✅ Yes — code is deployed |
+| **Brute force lockout (Keycloak-side)** | Keycloak realm settings | ❌ Need to configure in Railway Keycloak admin |
+| **Keycloak session timeout** | Keycloak realm settings | ❌ Need to configure in Railway Keycloak admin |
+| **Keycloak password policy** | Keycloak realm settings | ❌ Need to configure in Railway Keycloak admin |
+
+**The rule:** Django-side security = automatic. Keycloak-side security = manual config on Railway.
+
+**How to configure Keycloak brute force:**
+1. Open Railway Keycloak admin: `https://keycloak-production-4f96.up.railway.app/admin`
+2. Select `govasset` realm
+3. Go to **Realm settings** → **Security defenses** → **Brute force detection**
+4. Turn **ON** and set:
+   - Max login failures: `5`
+   - Wait increment: `15` minutes
+   - Permanent lockout: `ON`
+
+---
+
+### 30.6 Going Back to Localhost
+
+To run everything on your local machine again (using your local PostgreSQL):
+
+**In your `.env` file — revert any changes:**
+```
+# Keep these the same (they were never changed):
+DB_NAME=your_local_db
+DB_USER=your_local_user
+DB_PASSWORD=your_local_password
+DB_HOST=localhost
+DB_PORT=5432
+KEYCLOAK_SERVER_URL=http://localhost:8180
+DEBUG=True
+```
+
+**Remove these if you added them (they use Railway defaults):**
+```
+# DELETE these lines:
+DATABASE_URL=...
+ALLOWED_HOSTS=...
+PLATFORM_BASE_URL=...
+```
+
+**Start your local services:**
+```bash
+# Terminal 1 - PostgreSQL (already running)
+# Terminal 2 - Keycloak
+kc.bat start-dev --http-port=8180
+
+# Terminal 3 - Django
+python manage.py runserver 0.0.0.0:8000
+```
+
+Everything will work exactly as before. The code changes we made (`SECURE_PROXY_SSL_HEADER`, `DATABASE_URL` support, etc.) all have fallbacks to localhost defaults.
+
+---
+
+### 30.7 Mobile App Changes
+
+In your Flutter mobile app, find where the API base URL is defined (look for files containing `192.168` or `localhost:8000`) and change it:
+
+**Before (local development):**
+```dart
+const String apiBaseUrl = 'http://192.168.100.18:8000';
+```
+
+**After (Railway production):**
+```dart
+const String apiBaseUrl = 'https://goverment-assets-platform-production.up.railway.app';
+```
+
+**If you want to switch between local and Railway easily:**
+
+Create a config class:
+```dart
+class ApiConfig {
+  // Change this to switch between local and production
+  static const bool useProduction = true;
+  
+  static String get baseUrl => useProduction
+      ? 'https://goverment-assets-platform-production.up.railway.app'
+      : 'http://192.168.100.18:8000';
+}
+```
+
+Then use `ApiConfig.baseUrl` everywhere in your Flutter code.
+
+---
+
+### 30.8 Common Operations
+
+#### How to delete all users and start fresh
+
+```bash
+# In Railway Django terminal
+
+# Step 1: Delete demo data (assets, audit logs, org units, categories)
+python manage.py setup_demo_data --no-keycloak
+# This clears everything and recreates it
+
+# Step 2: If you want truly fresh (no data at all), drop schemas:
+python manage.py shell -c "
+from tenants.models import Ministry
+from authentication.models import CustomUser
+CustomUser.objects.all().delete()
+for m in Ministry.objects.all():
+    m.delete()
+    print(f'Deleted {m.schema_name}')
+"
+```
+
+#### How to run database migrations
+
+```bash
+# Public schema migrations
+python manage.py migrate
+
+# All tenant schema migrations
+python manage.py migrate_schemas
+```
+
+#### How to check if Django is connected to Keycloak
+
+```bash
+# In Railway Django terminal
+python manage.py shell -c "
+from authentication.keycloak_admin import KeycloakAdminService
+kc = KeycloakAdminService()
+print('Connected to Keycloak:', kc.server_url)
+kc._get_admin_token()
+print('Admin token obtained: OK')
+"
+```
+
+#### How to check if Django is connected to PostgreSQL
+
+```bash
+# In Railway Django terminal
+python manage.py dbshell
+# If you see a PostgreSQL prompt, it's connected
+\l  # List databases
+\q  # Quit
+```
+
+---
+
+### 30.9 How the Components Talk to Each Other
+
+This is the most important diagram to understand:
+
+```
+                    ┌──────────────────────────────────────────┐
+                    │                                          │
+                    │  USER'S BROWSER                          │
+                    │                                          │
+                    │  Types: https://govasset-api.up.railway  │
+                    │         .app/login/                      │
+                    └──────────────┬───────────────────────────┘
+                                   │
+                                   ▼
+              ┌────────────────────────────────────┐
+              │                                    │
+              │   DJANGO ON RAILWAY                │
+              │                                    │
+              │   Reads: KEYCLOAK_SERVER_URL        │
+              │   Reads: DATABASE_URL               │
+              │   Reads: SECRET_KEY                 │
+              │   Reads: ALLOWED_HOSTS              │
+              │                                    │
+              │   When user clicks SSO:             │
+              │   → Redirects to Keycloak           │
+              │                                    │
+              │   When user logs in via API:        │
+              │   → Checks password in its own DB   │
+              │   → Returns JWT token               │
+              │                                    │
+              └────────┬───────────────┬────────────┘
+                       │               │
+                       │               │
+              ┌────────▼───┐    ┌──────▼──────────────┐
+              │            │    │                      │
+              │ KEYCLOAK   │    │  POSTGRESQL          │
+              │ ON RAILWAY │    │  ON RAILWAY          │
+              │            │    │                      │
+              │ Users log  │    │ Tables:              │
+              │ in here    │    │ - authentication_    │
+              │            │    │   customuser         │
+              │ Config:    │    │ - tenants_ministry   │
+              │ - Realm    │    │ - tenants_domain     │
+              │ - Clients  │    │ - assets_asset       │
+              │ - Users    │    │ - organizations_     │
+              │            │    │   auditlog           │
+              └────────────┘    └──────────────────────┘
+```
+
+**The flow of an SSO login (step by step):**
+
+```
+1. User visits https://govasset-api.up.railway.app/login/
+2. Django shows the login page with "Sign in with Government SSO" button
+3. User clicks the button
+4. Django redirects to Keycloak at:
+   https://keycloak-production-4f96.up.railway.app/realms/govasset/.../auth
+5. Keycloak shows its login page
+6. User types username + password
+7. Keycloak checks credentials against its own database (in H2 or PostgreSQL)
+8. Keycloak redirects back to Django with an authorization code
+9. Django calls Keycloak's token endpoint to exchange code for tokens
+10. Django verifies the token signature using Keycloak's public key (fetched from JWKS endpoint)
+11. Django looks up the user in its OWN PostgreSQL database (authentication_customuser table)
+12. Django reads the user's role and ministry from its database
+13. User is logged in — dashboard is shown
+```
+
+**The two databases are separate:**
+
+| Database | Stores | Managed by |
+|----------|--------|-----------|
+| **Keycloak DB** (H2 or PostgreSQL) | Usernames, passwords, clients, realms | Keycloak itself |
+| **Django DB** (Railway PostgreSQL) | User profiles, roles, ministries, assets, audit logs | Django migrations |
+
+Keycloak says "this user is real" (authentication). Django says "this user can do X" (authorization).
+
+---
+
+### 30.10 Why Keycloak Uses Docker (Not GitHub)
+
+You asked: "Why did we push Django to GitHub but put Keycloak in a Docker image?"
+
+| Django | Keycloak |
+|--------|----------|
+| Python code → GitHub repo → Railway builds it | Java application → Docker image (pre-built) |
+| Railway uses Railpack (auto-detects Python) to build | Railway pulls the image from quay.io registry |
+| Every `git push` triggers a new build | Updates happen when you change the Docker version |
+| Source code is modified by us | We don't change Keycloak's source — we configure it |
+
+**You cannot push Keycloak source to GitHub because:** Keycloak is not our code. It's an open-source identity server maintained by the Keycloak team. We don't modify its source — we configure it through environment variables and the admin console. Docker is the standard way to deploy third-party services like databases, identity servers, and message queues.
+
+**If you wanted to push Keycloak to GitHub (advanced):** You would create a `Dockerfile` that extends the official Keycloak image:
+
+```dockerfile
+FROM quay.io/keycloak/keycloak:26.1
+COPY my-realm-export.json /opt/keycloak/data/import/
+ENV KC_HOSTNAME=https://keycloak-production-4f96.up.railway.app
+```
+
+Then push this `Dockerfile` to GitHub and deploy it on Railway. But this is unnecessary for our project — the simple Docker image + env vars approach works fine.
+
+---
+
+### 30.11 Summary: Localhost vs Railway Checklist
+
+| Aspect | Localhost | Railway |
+|--------|-----------|---------|
+| Django URL | `http://localhost:8000` | `https://goverment-assets-platform-production.up.railway.app` |
+| Keycloak URL | `http://localhost:8180` | `https://keycloak-production-4f96.up.railway.app` |
+| PostgreSQL | Local install (or Docker) | Railway managed |
+| Static files | Django built-in | Whitenoise |
+| Server | `runserver` | `gunicorn config.wsgi` |
+| HTTPS | No (HTTP) | Yes (edge-terminated) |
+| 24/7? | Only when laptop is on | Yes |
+| URL changes? | No (static) | No (static — Railway) |
+| Cost | Free (electricity) | Free tier |
+| Database reset | Drop local DB | `python manage.py setup_demo_data` |
+| Keycloak data reset | Reimport realm | Recreate in admin console |
+| Django env vars | `.env` file | Railway Variables tab |
+| Keycloak env vars | Command-line args | Railway Variables tab |
+| ngrok needed? | Only for sharing | No — Railway gives permanent URL |
