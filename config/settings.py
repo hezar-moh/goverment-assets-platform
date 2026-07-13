@@ -24,7 +24,9 @@ ALLOWED_HOSTS = [
     '10.103.10.150', # my laptop WiFi IP for mobile access
     '.ngrok-free.dev',  # For testing with ngrok
 ]
-# or we can use ALLOWED_HOSTS = ['*'] for development, but in production we should use specific domains only
+# In production (Railway), this is set via env var to allow .up.railway.app
+if config('ALLOWED_HOSTS', default=None):
+    ALLOWED_HOSTS = config('ALLOWED_HOSTS').split(',')
 
 SHARED_APPS = [
     'django_tenants',

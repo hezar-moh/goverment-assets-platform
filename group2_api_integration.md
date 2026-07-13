@@ -1,249 +1,261 @@
-# Group 2 — API Integration Guide
+# Group 2 — SSO Integration Guide
 
 ## Government Asset Management System
 
-**From:** Group 1 (Administration, Security & Multi-tenancy)
-**To:** Group 2 (Asset & Property Register Module)
-**Purpose:** Single Sign-On authentication, user identity, role-based access, and multi-tenant data isolation
+---
+
+## Quick Summary — What We Each Do
+
+| Who | Responsibility |
+|-----|--------------|
+| **Group 1 (us)** | We manage users, roles, ministries, and authentication. We run Keycloak SSO + the verify-token API. |
+| **Group 2 (you)** | You build your asset register UI. Your users log in through our Keycloak page. You call our API to find out who the user is. |
+
+**You do NOT build:** login page, password storage, user management, role management, ministry management.  
+**We handle all of that.** We tell you: "This user is Amina Hassan, she is MINISTRY_ADMIN for Ministry of Health." You just check the role and show/hide buttons accordingly.
 
 ---
 
 ## Table of Contents
 
-1. [What This Document Covers](#1-what-this-document-covers)
-2. [What We Need From Group 2 Before Integration Works](#2-what-we-need-from-group-2-before-integration-works)
-3. [Architecture Overview — How Login Works](#3-architecture-overview--how-login-works)
-4. [Keycloak Configuration — Endpoints Group 2 Needs](#4-keycloak-configuration--endpoints-group-2-needs)
-5. [The Complete Login Flow (Step by Step)](#5-the-complete-login-flow-step-by-step)
-6. [API Endpoint: Verify Token — Get User Role and Ministry](#6-api-endpoint-verify-token--get-user-role-and-ministry)
-7. [API Endpoint: Logout — End Session](#7-api-endpoint-logout--end-session)
-8. [Understanding the JWT Token (What's Inside)](#8-understanding-the-jwt-token-whats-inside)
-9. [Role Definitions — The 5 Permission Levels](#9-role-definitions--the-5-permission-levels)
-10. [Test Accounts](#10-test-accounts)
-11. [Ministries Available](#11-ministries-available)
-12. [Error Scenarios — What to Expect and How to Handle](#12-error-scenarios--what-to-expect-and-how-to-handle)
-13. [Security Rules Group 2 Must Follow](#13-security-rules-group-2-must-follow)
-14. [Integration Checklist](#14-integration-checklist)
+1. [What We Give You](#1-what-we-give-you)
+2. [What You Give Us](#2-what-you-give-us)
+3. [Prerequisites — Both Sides Must Be Accessible](#3-prerequisites--both-sides-must-be-accessible)
+4. [How Login Works (Step by Step)](#4-how-login-works-step-by-step)
+5. [Callback Handler — What Your Backend Does](#5-callback-handler--what-your-backend-does)
+6. [Verify Token — Getting the User's Role and Ministry](#6-verify-token--getting-the-users-role-and-ministry)
+7. [The 5 Roles and What Your UI Should Do](#7-the-5-roles-and-what-your-ui-should-do)
+8. [Test Accounts You Can Use](#8-test-accounts-you-can-use)
+9. [Logout](#9-logout)
+10. [Common Problems and Fixes](#10-common-problems-and-fixes)
+11. [Integration Checklist](#11-integration-checklist)
 
 ---
 
-## 1. What This Document Covers
+## 1. What We Give You
 
-This document tells Group 2 everything they need to connect their system to ours. By the end, Group 2 will be able to:
+After you send us your details (see Section 2), we set up your application in our Keycloak and give you:
 
-- Let their users log in using our **government SSO** (Keycloak login page)
-- Know the user's **identity** (name, username, email)
-- Know the user's **role** (what they are allowed to do)
-- Know the user's **ministry** (which ministry's data to show)
-- Log the user **out** from all systems at once
+| What we give you | Example | Why you need it |
+|-----------------|---------|-----------------|
+| **Client ID** | `group2-app` | Identifies your app to our Keycloak |
+| **Client Secret** | `a1b2c3d4-...` | Proves your app is authorized (keep this secret on your backend) |
+| **Our Keycloak Server URL** | `https://govasset-keycloak.up.railway.app` | Base URL for all authentication requests |
+| **Our Django API URL** | `https://govasset-api.up.railway.app` | Base URL for verify-token API calls |
 
-**What Group 2 does NOT need from us:**
-- Asset CRUD (create, read, update, delete) — you have your own
-- Asset categories — you have your own
-- Org hierarchy — you have your own
-- Audit logs — you log your own actions
-- Dashboard stats — you build your own
+From these two base URLs, you can construct all the endpoints you need:
 
-**We only provide what you cannot build yourself: authentication, identity, role, and ministry context.**
-
----
-
-## 2. What We Need From Group 2 Before Integration Works
-
-Before anything works, Group 2 must send us these **3 things** so we can register their application in our Keycloak server:
-
-| # | What we need | Example | Why |
-|---|-------------|---------|-----|
-| 1 | **Application Name** | `Group 2 Asset Register` | To label their client in our Keycloak admin panel |
-| 2 | **Login Redirect URI** | `https://group2-system.com/auth/callback` | Where Keycloak sends the user after successful login |
-| 3 | **Logout Redirect URI** | `https://group2-system.com` | Where Keycloak sends the user after logout |
-
-Once we receive these, we will:
-
-1. Create an OIDC client in our Keycloak for Group 2
-2. Generate a **Client ID** and **Client Secret**
-3. Share the complete configuration with Group 2
+| Endpoint | How to build it | Purpose |
+|----------|----------------|---------|
+| **SSO Login Page** | `{Keycloak URL}/realms/govasset/protocol/openid-connect/auth` | Send users here to log in |
+| **Token Exchange** | `{Keycloak URL}/realms/govasset/protocol/openid-connect/token` | Exchange auth code for tokens |
+| **Verify Token** | `{Django URL}/api/auth/verify-token/` | Get user's name, role, and ministry |
+| **Logout** | `{Keycloak URL}/realms/govasset/protocol/openid-connect/logout` | Log user out of all systems |
 
 ---
 
-## 3. Architecture Overview — How Login Works
+## 2. What You Give Us
 
-Group 2's system does NOT have its own login page. Every user must log in through our centralized Keycloak SSO.
+Before we can set anything up, we need these **3 things** from you:
+
+| What we need | Example | Why |
+|-------------|---------|-----|
+| **Your app name** | `Group 2 Asset Register` | We label your client in our admin panel |
+| **Your callback URL** | `https://your-system.com/auth/callback` or `https://your-ngrok.ngrok-free.app/auth/callback` | Where we send users after they log in on our Keycloak page. Must be a real public URL — not `localhost`. |
+| **Your logout URL** | `https://your-system.com` | Where we send users after they log out |
+
+**Important:** Your callback URL must be a real, accessible URL — not `localhost`. See Section 3.
+
+---
+
+## 3. Prerequisites — Both Sides Must Be Accessible
+
+This integration is **two-way**. Your system and our system both need to talk to each other over the internet.
+
+### Our side (we handle this)
+
+Both services are deployed on **Railway** (cloud hosting) and have permanent public URLs that never change:
+
+| Our service | URL |
+|------------|-----|
+| **Keycloak SSO** | `https://govasset-keycloak.up.railway.app` |
+| **Django API** | `https://govasset-api.up.railway.app` |
+
+Both services run 24/7 — no laptop needed, no URL changes.
+
+### Your side (you must do this)
+
+Your system must be accessible from the internet so that **Keycloak can redirect users back to your callback URL** after they log in.
+
+| Your system | How to expose it | What we need |
+|------------|-----------------|-------------|
+| **Your callback URL** | Host on a public server, OR use ngrok during development | The full callback URL (e.g. `https://your-system.com/auth/callback`) |
+
+**How to use ngrok on your side (for development testing):**
+
+1. Download ngrok from https://ngrok.com
+2. Run your system on a port (e.g., port 3000)
+3. In a terminal: `ngrok http 3000`
+4. ngrok gives you a URL: `https://xxxxxxxx.ngrok-free.app`
+5. Send us that URL as your callback URL (append `/auth/callback` to it)
+
+**Why this is needed:**
 
 ```
-                    ┌─────────────────────────────────────────┐
-                    │           KEYCLOAK (OUR SERVER)          │
-                    │  http://localhost:8180                   │
-                    │  Realm: govasset                        │
-                    │  Client: group2-app                     │
-                    └──────────┬──────────────────────┬───────┘
-                               │                      │
-                1. Redirect    │        4. Code for   │
-                   browser     │        tokens        │
-                   to Keycloak │                      │
-                               │                      │
-                    ┌──────────▼──────┐   ┌───────────▼──────┐
-                    │                 │   │                  │
-                    │  GROUP 2's      │   │  GROUP 1's       │
-                    │  Web App        │   │  Django API      │
-                    │  (frontend)     │   │  /api/auth/      │
-                    │                 │   │                  │
-                    └──────────┬──────┘   └──────────────────┘
-                               │
-                    ┌──────────▼──────┐
-                    │  GROUP 2's      │
-                    │  Backend Server │
-                    │  (own DB, own   │
-                    │   business      │
-                    │   logic)        │
-                    └─────────────────┘
+User opens your app → you redirect to our Keycloak → user logs in
+  → Keycloak redirects back to YOUR callback URL
+  → If your callback URL is localhost, Keycloak cannot reach it
+  → ngrok makes your localhost reachable from the internet
 ```
-
-**What Group 2 needs to implement on their side:**
-
-| Component | What to build |
-|-----------|--------------|
-| **Login button** | Redirects user's browser to our Keycloak auth endpoint |
-| **Callback handler** | Receives the auth code from Keycloak, exchanges it for tokens |
-| **Token storage** | Keeps the access token in memory or secure session |
-| **API call to our verify endpoint** | Calls `GET /api/auth/verify-token/` to get role + ministry |
-| **Logout button** | Redirects user's browser to Keycloak logout endpoint |
 
 ---
 
-## 4. Keycloak Configuration — Endpoints Group 2 Needs
+## 4. How Login Works (Step by Step)
 
-These are the Keycloak endpoints Group 2 will interact with. They will not change.
-
-| What | URL |
-|------|-----|
-| Keycloak Server | `http://localhost:8180` |
-| Realm | `govasset` |
-| Authorization Endpoint | `http://localhost:8180/realms/govasset/protocol/openid-connect/auth` |
-| Token Endpoint | `http://localhost:8180/realms/govasset/protocol/openid-connect/token` |
-| JWKS URI (public keys) | `http://localhost:8180/realms/govasset/protocol/openid-connect/certs` |
-| Userinfo Endpoint | `http://localhost:8180/realms/govasset/protocol/openid-connect/userinfo` |
-| Logout Endpoint | `http://localhost:8180/realms/govasset/protocol/openid-connect/logout` |
-
-**Values we will generate and share (after Group 2 sends us their redirect URIs):**
-
-| Setting | Value (example) |
-|---------|----------------|
-| Client ID | `group2-app` |
-| Client Secret | `(will be generated by Keycloak)` |
-
----
-
-## 5. The Complete Login Flow (Step by Step)
-
-### Step 1 — User clicks "Login" on Group 2's website
-
-Group 2's frontend redirects the user's browser to:
+Here is exactly what happens when a user clicks "Login" on your website:
 
 ```
-GET http://localhost:8180/realms/govasset/protocol/openid-connect/auth?
+Step 1: User clicks "Login with Government SSO" on your site
+          ↓
+Step 2: Your app redirects the user's browser to our Keycloak login page
+          ↓
+Step 3: User sees our government-branded login page, types username + password
+          ↓
+Step 4: Keycloak verifies the credentials
+          ↓
+Step 5: Keycloak redirects the browser back to YOUR callback URL
+        with an authorization code: https://your-system.com/auth/callback?code=abc123
+          ↓
+Step 6: YOUR BACKEND (server-side, NOT browser) calls our token endpoint
+        to exchange the code for tokens
+          ↓
+Step 7: Keycloak returns: access_token + refresh_token + id_token
+          ↓
+Step 8: YOUR BACKEND calls our verify-token API with the access_token
+        to get the user's name, role, and ministry
+          ↓
+Step 9: You create a session and show your dashboard to the user
+```
+
+**How to redirect the user to Keycloak (Step 2):**
+
+Put a button on your page that links to:
+
+```
+https://{OUR_KEYCLOAK_URL}/realms/govasset/protocol/openid-connect/auth?
     client_id=group2-app&
-    redirect_uri=https://group2-system.com/auth/callback&
+    redirect_uri=https://{YOUR_CALLBACK_URL}&
     response_type=code&
     scope=openid+profile+email&
-    state=RANDOM_STRING
+    state=YOUR_RANDOM_STRING
 ```
 
-**Query parameter explanation:**
+**Parameters explained:**
 
 | Parameter | Value | Why |
 |-----------|-------|-----|
-| `client_id` | `group2-app` | Identifies Group 2's application to Keycloak |
-| `redirect_uri` | `https://group2-system.com/auth/callback` | Where to send the user after login (must match what you gave us) |
-| `response_type` | `code` | Requests the authorization code flow |
-| `scope` | `openid profile email` | Asks for user identity info |
-| `state` | Random string | Prevents CSRF attacks — verify it matches when the user returns |
+| `client_id` | `group2-app` | Identifies your app (we give you this) |
+| `redirect_uri` | Your callback URL | Where to send the user back (you give us this) |
+| `response_type` | `code` | Use the authorization code flow |
+| `scope` | `openid profile email` | Get user's basic info |
+| `state` | Random string you generate | Security — prevents CSRF attacks |
 
-### Step 2 — User sees our Keycloak login page
+**Important:** Generate a random `state` string for each login request. Store it in the user's session. When Keycloak sends the user back, verify the `state` matches.
 
-The user sees the government-branded login page in their browser. They type their username and password.
+---
 
-### Step 3 — Keycloak redirects back to Group 2
+## 5. Callback Handler — What Your Backend Does
 
-After successful login, Keycloak redirects the browser to:
+When Keycloak redirects the user back to your callback URL, your backend must handle it. Here is exactly what your code should do:
 
-```
-https://group2-system.com/auth/callback?code=abc123&state=RANDOM_STRING
-```
-
-**Important:** Group 2 must verify that the `state` value matches what they sent in Step 1.
-
-### Step 4 — Group 2's backend exchanges the code for tokens
-
-Group 2's backend makes a server-to-server call (NOT from the browser):
+### Step A — Verify the `state` parameter
 
 ```
-POST http://localhost:8180/realms/govasset/protocol/openid-connect/token
+Check: Does the "state" value in the URL match what you stored in Step 2?
+  YES → Continue
+  NO → Reject the request (possible CSRF attack)
+```
+
+### Step B — Exchange the code for tokens
+
+Your backend makes a **server-to-server** POST request (not from the browser):
+
+```
+POST https://{OUR_KEYCLOAK_URL}/realms/govasset/protocol/openid-connect/token
 Content-Type: application/x-www-form-urlencoded
 
 grant_type=authorization_code
 &client_id=group2-app
-&client_secret=THE_CLIENT_SECRET
-&code=abc123
-&redirect_uri=https://group2-system.com/auth/callback
+&client_secret=YOUR_CLIENT_SECRET
+&code=THE_CODE_FROM_THE_URL
+&redirect_uri=https://{YOUR_CALLBACK_URL}
 ```
 
-### Step 5 — Keycloak returns tokens
-
-**Success Response (HTTP 200):**
+**What you get back:**
 ```json
 {
-    "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "access_token": "eyJhbGciOiJSUzI1NiIs...",
     "expires_in": 300,
-    "refresh_expires_in": 1800,
-    "refresh_token": "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9...",
-    "token_type": "Bearer",
-    "id_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "not-before-policy": 0,
-    "session_state": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "scope": "openid profile email"
+    "refresh_token": "eyJhbGciOiJIUzUxMiIs...",
+    "id_token": "eyJhbGciOiJSUzI1NiIs..."
 }
 ```
 
-**What each token is for:**
+**Save the `access_token`** — you need it for the next step.
 
-| Token | Purpose | Expiry |
-|-------|---------|--------|
-| `access_token` | Call our API. Contains user claims (role, ministry_schema) embedded in the JWT. | 5 minutes |
-| `refresh_token` | Get a new access token when it expires. | 30 minutes |
-| `id_token` | Contains user profile info (name, email). Not used for API calls. | 5 minutes |
+**Save the `refresh_token`** — you use it when the access token expires (5 minutes).
 
-### Step 6 — Group 2 calls our API to get user role and ministry
+### Step C — Call our API to get the user's identity
 
-**(See Section 6 below for full details)**
+```
+GET https://{OUR_DJANGO_URL}/api/auth/verify-token/
+Authorization: Bearer eyJhbGciOiJSUzI1NiIs...
+```
 
-### Step 7 — Group 2 shows their dashboard
+**What you get back:**
+```json
+{
+    "valid": true,
+    "user": {
+        "id": 29,
+        "username": "moh_admin",
+        "full_name": "Amina Hassan",
+        "email": "amina@moh.go.tz",
+        "role": "MINISTRY_ADMIN",
+        "ministry_schema": "moh_schema",
+        "ministry": "Ministry of Health"
+    }
+}
+```
 
-Group 2 now knows:
-- Who the user is (`full_name`, `username`)
-- What they can do (`role`)
-- Which ministry's data to show (`ministry_schema`, `ministry`)
+This tells you everything you need:
+- **`full_name`** — Show on your dashboard header: "Welcome, Amina Hassan"
+- **`role`** — Controls permissions (see Section 7)
+- **`ministry`** — Which ministry's data to show
+- **`ministry_schema`** — Internal identifier for scoping queries
+
+### Step D — Create a session and show your dashboard
+
+Store the user info in your session. The user is now logged in.
 
 ---
 
-## 6. API Endpoint: Verify Token — Get User Role and Ministry
+## 6. Verify Token — Getting the User's Role and Ministry
 
-This is the **only Group 1 API endpoint** Group 2 needs to call. It validates the user's access token and returns their complete profile including role and ministry.
+This is the most important API call. You will call it:
+
+1. **After login** (to get the initial user info)
+2. **On every page load** (to verify the user still has permission)
+3. **Before any sensitive action** (like delete, approve, or financial transactions)
 
 ### Request
 
 ```
-GET http://localhost:8000/api/auth/verify-token/
-Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+GET https://{OUR_DJANGO_URL}/api/auth/verify-token/
+Authorization: Bearer eyJhbGciOiJSUzI1NiIs...
 ```
 
-**Headers:**
-
-| Header | Value | Required? |
-|--------|-------|-----------|
-| `Authorization` | `Bearer <access_token>` | Yes |
-
-### Success Response (HTTP 200)
+### Success Response
 
 ```json
 {
@@ -260,19 +272,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-**Field explanations:**
-
-| Field | Example | What it means |
-|-------|---------|---------------|
-| `user.id` | `29` | Internal user ID in our database |
-| `user.username` | `moh_admin` | Login username (unique across entire system) |
-| `user.full_name` | `Amina Hassan` | User's real name — display this in your UI header |
-| `user.email` | `amina@moh.go.tz` | User's email address |
-| `user.role` | `MINISTRY_ADMIN` | **Permission level** — use this to control what the user can see/do in your UI (see Section 9 for all 5 roles) |
-| `user.ministry_schema` | `moh_schema` | **Internal schema name** — use this to scope database queries if you read from our database |
-| `user.ministry` | `Ministry of Health` | **Display name** — show this in your UI to indicate which ministry the user belongs to |
-
-### Error Response (HTTP 401)
+### Error Response (401)
 
 ```json
 {
@@ -280,301 +280,140 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-The token has expired or is invalid. Group 2 should:
-1. Try to refresh the token using the refresh token (see Step 5.1 below)
-2. If refresh fails, redirect the user back to the Keycloak login page
-
-### Step 5.1 — Token Refresh (When Access Token Expires)
-
-If the verify-token call returns 401, Group 2 can get a new access token using the refresh token:
+If you get 401, the token has expired. Use the refresh token to get a new one:
 
 ```
-POST http://localhost:8180/realms/govasset/protocol/openid-connect/token
+POST https://{OUR_KEYCLOAK_URL}/realms/govasset/protocol/openid-connect/token
 Content-Type: application/x-www-form-urlencoded
 
 grant_type=refresh_token
 &client_id=group2-app
-&client_secret=THE_CLIENT_SECRET
-&refresh_token=eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9...
+&client_secret=YOUR_CLIENT_SECRET
+&refresh_token=THE_REFRESH_TOKEN
 ```
 
-**Success Response (HTTP 200):**
-```json
-{
-    "access_token": "eyJhbGciOiJSUzI1NiIs...",
-    "expires_in": 300,
-    "refresh_expires_in": 1800,
-    "refresh_token": "eyJhbGciOiJIUzUxMiIs...",
-    "token_type": "Bearer"
-}
-```
-
-**Error Response (HTTP 400):**
-The refresh token has also expired. Group 2 must redirect the user back to the Keycloak login page.
+If the refresh also fails, redirect the user back to the Keycloak login page.
 
 ---
 
-## 7. API Endpoint: Logout — End Session
+## 7. The 5 Roles and What Your UI Should Do
 
-When the user clicks "Logout" on Group 2's system, redirect their browser to:
+Our system has exactly **5 roles**. Every user in the entire project has one of these.
 
-```
-GET http://localhost:8180/realms/govasset/protocol/openid-connect/logout?
-    id_token_hint=eyJhbGciOiJSUzI1NiIs...&
-    post_logout_redirect_uri=https://group2-system.com
-```
+| Role | Who has it | What your UI should allow |
+|------|-----------|--------------------------|
+| `SUPER_ADMIN` | Platform administrators | Full access. Can see all ministries' data. Your system may show a ministry selector. |
+| `MINISTRY_ADMIN` | Ministry IT staff | Full access within their own ministry. Can create, edit, delete assets. Can manage users. |
+| `AGENCY_MANAGER` | Agency heads (hospital directors, etc.) | Can create and edit assets. Can manage facility clerks. Cannot delete. |
+| `FACILITY_CLERK` | Frontline staff (store clerks, etc.) | Can register and edit assets they created. Cannot delete or manage users. |
+| `AUDITOR` | Government auditors | Read-only. Can view everything but cannot create, edit, or delete. |
 
-**Query parameter explanation:**
-
-| Parameter | Value | Why |
-|-----------|-------|-----|
-| `id_token_hint` | The ID token from Step 5 | Tells Keycloak which session to end |
-| `post_logout_redirect_uri` | `https://group2-system.com` | Where to redirect after logout |
-
-After logout, Keycloak redirects the browser to `https://group2-system.com`. **This logs the user out of all connected systems at once** (single sign-out).
+**Rule:** Check the `role` field on every request, not just at login. If the user's role changes (admin promotes them), the next verify-token call will reflect the change.
 
 ---
 
-## 8. Understanding the JWT Token (What's Inside)
+## 8. Test Accounts You Can Use
 
-The access token that Keycloak returns is a **JWT (JSON Web Token)**. Group 2 can decode it to read the embedded user information without calling any API.
+All passwords: `Admin@123`
 
-**Decoded access token payload:**
-```json
-{
-    "exp": 1712345678,
-    "iat": 1712345378,
-    "auth_time": 1712345378,
-    "jti": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "iss": "http://localhost:8180/realms/govasset",
-    "aud": "account",
-    "sub": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-    "typ": "Bearer",
-    "azp": "group2-app",
-    "session_state": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "acr": "1",
-    "realm_access": {
-        "roles": ["default-roles-govasset", "offline_access", "uma_authorization"]
-    },
-    "resource_access": {
-        "account": {
-            "roles": ["manage-account", "manage-account-links", "view-profile"]
-        }
-    },
-    "scope": "openid profile email",
-    "sid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "email_verified": true,
-    "role": "MINISTRY_ADMIN",
-    "ministry_schema": "moh_schema",
-    "preferred_username": "moh_admin",
-    "given_name": "Amina",
-    "family_name": "Hassan",
-    "email": "amina@moh.go.tz"
-}
+| Username | Full Name | Role | Ministry | What to test |
+|----------|-----------|------|----------|-------------|
+| `superadmin` | System Administrator | SUPER_ADMIN | All ministries | Should see all data |
+| `moh_admin` | Amina Hassan | MINISTRY_ADMIN | Ministry of Health | Should see MOH data only, full access |
+| `mnh_manager` | John Mwangi | AGENCY_MANAGER | Ministry of Health | Should see MOH data, limited management |
+| `rad_clerk` | Asha Salum | FACILITY_CLERK | Ministry of Health | Should see MOH data, no delete |
+| `moh_auditor` | David Mushi | AUDITOR | Ministry of Health | Should see MOH data, read-only |
+| `mof_admin` | Grace Mbwilo | MINISTRY_ADMIN | Ministry of Finance | Should see MOF data only |
+
+**Test sequence to verify your integration:**
+
 ```
+1. Log in as moh_admin
+   → Your dashboard should show: "Amina Hassan" + "MINISTRY_ADMIN" + "Ministry of Health"
+   → You should see Ministry of Health data (not Finance data)
+   → You should have full CRUD access
 
-**The two most important custom claims:**
-- `"role": "MINISTRY_ADMIN"` — embedded by our Keycloak user attributes
-- `"ministry_schema": "moh_schema"` — embedded by our Keycloak user attributes
+2. Log in as rad_clerk
+   → Your dashboard should show: "Asha Salum" + "FACILITY_CLERK" + "Ministry of Health"
+   → Delete button should be hidden or disabled
 
-Group 2 can either:
-1. **Decode the JWT themselves** — read `role` and `ministry_schema` directly from the token (no API call needed, but may be stale if admin changes role)
-2. **Call our verify-token API** — always returns the latest data (recommended for critical permission checks)
+3. Log in as moh_auditor
+   → Your dashboard should show: "David Mushi" + "AUDITOR" + "Ministry of Health"
+   → All create/edit/delete buttons should be hidden
+
+4. Log in as mof_admin
+   → Your dashboard should show: "Grace Mbwilo" + "MINISTRY_ADMIN" + "Ministry of Finance"
+   → You should see Ministry of Finance data (not Health data)
+```
 
 ---
 
-## 9. Role Definitions — The 5 Permission Levels
+## 9. Logout
 
-Our system has exactly **5 roles**. Every user in the entire 10-group project has one of these roles. Group 2 should use the `role` field to control what each user can do in their UI.
+When the user clicks "Logout" on your site, redirect their browser to:
 
-| Role | Level | Who has this role | What they can do (across the whole system) |
-|------|-------|-------------------|-------------------------------------------|
-| `SUPER_ADMIN` | 5 (highest) | System Administrators | Full access to everything — all ministries, all data, all settings. Only 1-2 people have this role. |
-| `MINISTRY_ADMIN` | 4 | Ministry IT Administrators | Full access within their own ministry. Can manage users, create/edit any asset, view audit logs. |
-| `AGENCY_MANAGER` | 3 | Agency Heads (e.g., Hospital Director) | Can manage assets within their agency, create Facility Clerk accounts, view reports. |
-| `FACILITY_CLERK` | 2 | Frontline staff (e.g., Store Clerk) | Can register new assets, view assets, edit assets they created. Cannot delete or manage users. |
-| `AUDITOR` | 1 (lowest) | Government Auditors | Read-only access. Can view all assets and audit logs. Cannot create, edit, or delete anything. |
+```
+https://{OUR_KEYCLOAK_URL}/realms/govasset/protocol/openid-connect/logout?
+    id_token_hint=THE_ID_TOKEN_FROM_LOGIN&
+    post_logout_redirect_uri=https://{YOUR_LOGOUT_URL}
+```
 
-**How Group 2 should use roles in their UI:**
-
-| UI Element | Show to |
-|-----------|---------|
-| "Create Asset" button | MINISTRY_ADMIN, AGENCY_MANAGER, FACILITY_CLERK |
-| "Edit Asset" button | MINISTRY_ADMIN, AGENCY_MANAGER, FACILITY_CLERK (own assets) |
-| "Delete Asset" button | MINISTRY_ADMIN only |
-| "View Audit Log" button | MINISTRY_ADMIN, AUDITOR |
-| "Manage Users" button | MINISTRY_ADMIN, AGENCY_MANAGER (limited) |
-| "Dashboard with all ministries" | SUPER_ADMIN only |
-| "Export Report" button | All roles (but scope to their ministry) |
+This logs the user out of **our Keycloak session**. Since all groups use the same Keycloak, this logs them out of every group's system at once.
 
 ---
 
-## 10. Test Accounts
+## 10. Common Problems and Fixes
 
-All 6 accounts use the same password: `Admin@123`
-
-| Username | Full Name | Role | Ministry | Keycloak Available? |
-|----------|-----------|------|----------|-------------------|
-| `superadmin` | System Administrator | SUPER_ADMIN | All Ministries | Yes |
-| `moh_admin` | Amina Hassan | MINISTRY_ADMIN | Ministry of Health | Yes |
-| `mnh_manager` | John Mwangi | AGENCY_MANAGER | Ministry of Health | Yes |
-| `rad_clerk` | Asha Salum | FACILITY_CLERK | Ministry of Health | Yes |
-| `moh_auditor` | David Mushi | AUDITOR | Ministry of Health | Yes |
-| `mof_admin` | Grace Mbwilo | MINISTRY_ADMIN | Ministry of Finance | Yes |
-
-**Group 2 can use any of these accounts to test their integration.**
-- Log in as `moh_admin` → should see "Ministry of Health" scoped data
-- Log in as `mof_admin` → should see "Ministry of Finance" scoped data
-- Log in as `superadmin` → can see all ministries
+| Problem | Cause | Fix |
+|---------|-------|-----|
+| User sees "Invalid redirect URI" after login | The callback URL you gave us doesn't match the URL Keycloak is redirecting to | Check both are identical (including trailing slashes, http vs https) |
+| Your callback returns "state mismatch" | You didn't generate/stored the `state` parameter | Generate a random `state` for each login, store it in session, verify on return |
+| verify-token returns 401 | Access token expired | Use refresh token to get a new access token |
+| refresh also returns error | Refresh token also expired | Redirect user back to Keycloak login page |
+| Keycloak page doesn't load | Our server is down | Contact us — our services run 24/7 on Railway |
+| User gets redirected back to your site but your site shows an error | Your callback handler has a bug | Check your server logs. The code exchange or verify-token call may be failing |
+| You get "User not found" from verify-token | User exists in Keycloak but not in our Django database | Contact us — we need to create the user in our system |
 
 ---
 
-## 11. Ministries Available
+## 11. Integration Checklist
 
-| Ministry | Schema Name | Users Currently |
-|----------|-------------|----------------|
-| Ministry of Health | `moh_schema` | moh_admin, mnh_manager, rad_clerk, moh_auditor |
-| Ministry of Finance | `mof_schema` | mof_admin |
-| Super Admin (platform-wide) | None (public schema) | superadmin |
+### Before you start — send us:
 
-**Multi-tenancy rule (important):**
-When a user with `ministry_schema: "moh_schema"` is logged in, Group 2 must:
-- Show ONLY Ministry of Health data
-- Hide Ministry of Finance data
-- Hide Ministry of Finance users from user lists
-- Apply this filtering in Group 2's own database queries
+- [ ] Your app name (e.g., "Group 2 Asset Register")
+- [ ] Your callback URL (must be publicly accessible, NOT localhost)
+- [ ] Your logout redirect URL
 
----
-
-## 12. Error Scenarios — What to Expect and How to Handle
-
-### Scenario 1: User types wrong password on Keycloak page
-
-Keycloak shows an error message on the login page: "Invalid username or password."
-After 5 failed attempts, the account is locked.
-
-**Group 2 does nothing** — this is handled entirely by Keycloak. Group 2's callback will not be called.
-
-### Scenario 2: Auth code expires before exchange
-
-Auth codes are valid for **60 seconds**. If Group 2's backend takes too long to call the token endpoint:
-
-```
-POST http://localhost:8180/realms/govasset/protocol/openid-connect/token
-```
-
-**Response (HTTP 400):**
-```json
-{
-    "error": "invalid_grant",
-    "error_description": "Code is expired"
-}
-```
-
-**Fix:** Redirect the user back to the Keycloak login page again. The user will not need to re-enter their password if their Keycloak session is still active (they will be immediately redirected back with a new code).
-
-### Scenario 3: Access token expired
-
-Group 2 calls our API:
-
-```
-GET /api/auth/verify-token/
-Authorization: Bearer <expired_token>
-```
-
-**Response (HTTP 401):**
-```json
-{
-    "detail": "Given token not valid for any token type"
-}
-```
-
-**Fix:** Use the refresh token at the Keycloak token endpoint (see Section 5.1).
-
-### Scenario 4: User's account is deactivated by an admin
-
-The user logs in successfully on Keycloak (Keycloak doesn't know about deactivation).
-Group 2 calls our verify-token endpoint.
-
-**Response (HTTP 401):**
-```json
-{
-    "detail": "Given token not valid for any token type"
-}
-```
-
-**Fix:** Group 2 should treat this like an expired token and redirect to the Keycloak login page. Keycloak will show the login page, but the user's session may still be active. If the user keeps getting redirected in a loop, their account has likely been deactivated — they should contact their Ministry Administrator.
-
-### Scenario 5: Our server is down
-
-Group 2 calls our verify-token endpoint but gets a network error (connection refused, timeout).
-
-**Fix:** Group 2 should:
-1. Show a friendly error message: *"Authentication service is temporarily unavailable. Please try again later."*
-2. Keep the user's current session alive (don't log them out)
-3. Retry after a few seconds
-4. Optionally, decode the JWT locally (from the access token) as a fallback — the token's `role` and `ministry_schema` claims can still be trusted within the token's expiry window
-
-### Scenario 6: Group 2 receives a token for a user that doesn't exist in our database
-
-This should not happen if users are created through our system. But if it does, verify-token will return:
-
-**Response (HTTP 401):**
-```json
-{
-    "detail": "User not found"
-}
-```
-
-**Fix:** The user exists in Keycloak but not in our Django database. Contact Group 1 to create the user properly.
-
----
-
-## 13. Security Rules Group 2 Must Follow
-
-1. **Never store user passwords.** Group 2 never handles passwords — that is Keycloak's job. If Group 2's login form sends passwords to their own backend, that is a security violation.
-
-2. **Never share the Client Secret.** The `client_secret` is like a password for Group 2's application. It must never be exposed in frontend code, browser JavaScript, or mobile app code. Only Group 2's backend server should know it.
-
-3. **Always validate the `state` parameter.** When Keycloak redirects back to Group 2's callback, verify that the `state` value matches what was sent in the original auth request. This prevents CSRF attacks.
-
-4. **Use HTTPS in production.** The OIDC flow sends tokens in URLs and HTTP headers. In production, all communication must be over HTTPS. During development, HTTP to localhost is acceptable.
-
-5. **Validate tokens on your backend.** Token verification should happen on Group 2's backend server, not in browser JavaScript. Never trust a token that was not verified by Group 2's server.
-
-6. **Respect the `role` field.** If a user with `role: "FACILITY_CLERK"` tries to perform an action that requires `MINISTRY_ADMIN`, Group 2 must reject the request. Do not rely on hiding buttons alone — enforce permissions on the backend.
-
-7. **Scope data by `ministry_schema`.** If a request comes in for Ministry of Finance data from a user whose `ministry_schema` is `moh_schema`, reject it. Data isolation between ministries is mandatory.
-
----
-
-## 14. Integration Checklist
-
-### Before starting — Group 2 sends us:
-
-- [ ] Application name
-- [ ] Login redirect URI
-- [ ] Logout redirect URI
-
-### We send back to Group 2:
+### We send back to you:
 
 - [ ] Client ID
 - [ ] Client Secret
-- [ ] This document ✓ (already have it)
+- [ ] Our Keycloak URL: `https://govasset-keycloak.up.railway.app` (permanent)
+- [ ] Our Django API URL: `https://govasset-api.up.railway.app` (permanent)
 
-### Group 2 implements:
+### You implement on your end:
 
-- [ ] Login button redirects to Keycloak auth endpoint
-- [ ] Callback handler exchanges code for tokens
-- [ ] `GET /api/auth/verify-token/` called after every login
-- [ ] `user.role` used to control permissions
-- [ ] `user.ministry` used to scope data
-- [ ] Token refresh implemented (5-min access token expiry)
-- [ ] Logout button redirects to Keycloak logout
-- [ ] Error handling for expired tokens, server down, etc.
-- [ ] Backend-enforced permission checks (not just UI hiding)
-- [ ] Data scoped by ministry_schema
+- [ ] Host your system or use ngrok so your callback URL is publicly accessible
+- [ ] Add "Login with Government SSO" button on your site
+- [ ] Generate random `state` parameter for each login request
+- [ ] Create a `/auth/callback` endpoint in your backend
+- [ ] Code exchange: POST to our token endpoint with `grant_type=authorization_code`
+- [ ] Call `GET /api/auth/verify-token/` with the access token
+- [ ] Use `user.role` to control permissions (hide/show buttons)
+- [ ] Use `user.ministry` to filter data (never show cross-ministry data)
+- [ ] Implement token refresh (when access token expires)
+- [ ] Handle logout redirect to our Keycloak logout endpoint
 
 ---
 
-*End of document. For questions, contact Group 1 (Administration, Security & Multi-tenancy).*
+## Summary — What You Need to Know
+
+| Topic | Answer |
+|-------|--------|
+| **Do you need to build a login page?** | No. Your users log in on our Keycloak page. |
+| **Do you need to store passwords?** | No. We handle all password management. |
+| **Do you need to manage users?** | No. We create and manage all users. |
+| **Do you need to manage roles?** | No. We assign roles. You just read the `role` field. |
+| **Do you need to manage ministries?** | No. We manage ministries. You just read the `ministry_schema` field. |
+| **Do you need to host your system?** | Yes. Use a public server or ngrok so Keycloak can redirect users back to your callback URL. |
+| **What do you actually build?** | Your asset register UI + a callback handler + permission checks based on `role`. |

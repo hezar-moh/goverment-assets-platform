@@ -2416,21 +2416,51 @@ Step 3 — They use that token on every request:
 
 ### Do other groups go to the Keycloak login page?
 
-**No.** This is important to understand.
+**It depends on the group.** There are two types of integration:
 
-Keycloak's login page is only for **web browser users** — real ministry staff using the website. The journey for web users is:
+**Type A — Groups WITHOUT their own login page (Group 2, 3, 4, etc.)**
+These groups built their own backend and database but **did not build a login system**. Their users log in through **our Keycloak SSO page** — the same government-branded login page our own web users see:
 
 ```
-Web browser user → gets redirected to Keycloak login page → types password there
+User → opens Group 2's app → redirected to OUR Keycloak login page
+  → types password on Keycloak → redirected back to Group 2's app
+  → Group 2's app calls our API to get the user's role + ministry
 ```
 
-Other groups are **developers building systems**, not humans typing passwords in a browser. They use our **API login endpoint** directly (the `POST /api/auth/login/` shown above). That endpoint checks the username and password internally and gives back a JWT token. Keycloak's web page never appears.
+The user leaves Group 2's site, authenticates on ours, then returns. This is the SSO flow.
 
-Think of it this way:
-- Keycloak's page = the front door of a government office (for real staff walking in)
-- API login endpoint = a back door for systems talking to systems (no human needed)
+**Type B — Groups WITH their own login page (Group 5, 6, etc.)**
+These groups built their own login form. Their backend calls our **API login endpoint** directly:
 
-Both doors lead to the same building — but other groups use the back door.
+```
+User → types password on Group 5's login form
+  → Group 5's backend calls POST /api/auth/login/ with our credentials
+  → Our API returns JWT token → Group 5 lets the user in
+```
+
+Our Keycloak page never appears. This is the API flow.
+
+**Both approaches work because every user is created in our system.** The difference is only whether the user sees our Keycloak login page (Type A) or the other group's own form (Type B).
+
+**Important — How SSO works across multiple groups:**
+
+If ALL groups use the SSO approach (Type A), the user only logs in **once** in their browser, then can access every group's system without typing their password again:
+
+```
+Browser Tab 1: User logs in on Group 2's system
+  → Redirected to Keycloak → logs in → redirected back to Group 2
+
+Browser Tab 2: User opens Group 5's system (same browser)
+  → Redirected to Keycloak → Keycloak sees "already logged in"
+  → Immediately redirects back to Group 5 — NO password prompt
+
+Browser Tab 3: User opens Group 10's system
+  → Same — instant access, no login needed
+```
+
+This works because Keycloak stores a session cookie in the browser. Every group's system redirects to Keycloak, Keycloak checks the cookie, sees an active session, and sends the user straight back with a new token for that group.
+
+**This is the whole purpose of SSO.** One username and password. Access to all 10 systems.
 
 ### What if they want a public API (no token required)?
 
@@ -2752,18 +2782,19 @@ STEP 6 (later): We deploy to production.
 
 ### Do we also give them access to Keycloak?
 
-**No.** Other groups do NOT need Keycloak access. Here is why:
+**Depends on the group type:**
+
+**For groups WITHOUT their own login (Type A):**
+Yes — their users will log in through our Keycloak SSO page. We register their app as an OIDC client in Keycloak and give them a Client ID + Client Secret. Their backend never handles passwords.
+
+**For groups WITH their own login (Type B):**
+No — they call our API login endpoint directly with username + password. Keycloak is never involved. We give them test credentials + the API base URL.
 
 ```
-For API access, other groups use:
-  Username + Password → Django → Django JWT token
+Type A (no login): User → Keycloak SSO page → token → Group 2's app
+Type B (has login): User → Group 5's form → API call → our JWT → Group 5's app
 
-They NEVER go through Keycloak for API access.
-They NEVER need to log into Keycloak admin.
-They NEVER need Keycloak credentials.
-
-Keycloak is ONLY for web browser SSO login.
-API access uses Django's own JWT authentication.
+Both types: the user is authenticated by US. The difference is only the UI they see.
 ```
 
 ### What if our system is down? How does it affect other groups?
@@ -2878,46 +2909,162 @@ This is the practical guide for contacting groups 2-10 and getting them connecte
 python manage.py runserver 0.0.0.0:8000
 ```
 
-#### Step 2: Start ngrok (creates a public URL for your local server)
+#### Step 2: Deploy to Railway (recommended — permanent URLs, no ngrok needed)
 
-ngrok is a free tool that creates a temporary public internet address that forwards to your laptop. Your friend abroad can access it from anywhere.
+Railway hosts both Django and Keycloak with permanent URLs that never change. Group 2 sets up once and is done. Both services run 24/7 — your laptop can be off.
 
-1. Download ngrok from https://ngrok.com/download
-2. Sign up for a free account at https://dashboard.ngrok.com
-3. Get your auth token from the dashboard
-4. Open a SECOND terminal and run:
+**What you deploy:**
 
+```
+Railway Project "govasset"
+  ├── Service 1: Django API    → https://govasset-api.up.railway.app   (permanent)
+  ├── Service 2: PostgreSQL    → Railway managed (shared between Django + Keycloak)
+  └── Service 3: Keycloak      → https://govasset-keycloak.up.railway.app (permanent)
+```
+
+---
+##### Deploy PostgreSQL (do this first)
+
+Both Django and Keycloak need a database. Railway provides PostgreSQL as a plugin.
+
+1. In Railway dashboard → **New** → **Database** → **Add PostgreSQL**
+2. Wait for it to provision. Copy the `DATABASE_URL` connection string (looks like `postgresql://...`)
+3. You'll use this for both Django and Keycloak
+
+---
+##### Deploy Django
+
+1. Push your code to GitHub
+2. Railway → **New Project** → **Deploy from GitHub repo** → select your repo
+3. Railway auto-detects Django. Set these in the **Settings** tab:
+   - **Build command:** `pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate`
+   - **Start command:** `gunicorn config.wsgi`
+4. In the **Variables** tab, add these environment variables:
+
+| Variable | Value | Why |
+|----------|-------|-----|
+| `DATABASE_URL` | The Railway PostgreSQL URL from above | Connect Django to the database |
+| `SECRET_KEY` | Generate a random 50-char key | Django's cryptographic signing |
+| `DJANGO_SETTINGS_MODULE` | `config.settings` | Tell Django which settings to use |
+| `DEBUG` | `False` | Never run DEBUG in production |
+| `ALLOWED_HOSTS` | `.up.railway.app` | Allow Railway's domain |
+| `CSRF_TRUSTED_ORIGINS` | `https://govasset-api.up.railway.app` | Allow POST requests from Railway |
+| `KEYCLOAK_SERVER_URL` | `https://govasset-keycloak.up.railway.app` | Django talks to Keycloak |
+| `KEYCLOAK_CLIENT_ID` | `govasset-django` | Your OIDC client in Keycloak |
+| `KEYCLOAK_CLIENT_SECRET` | (the secret from Keycloak) | Your OIDC client secret |
+| `PLATFORM_BASE_URL` | `https://govasset-api.up.railway.app` | For emails, redirects |
+
+5. Railway deploys automatically. Your Django URL will be: `https://govasset-api.up.railway.app`
+
+**If you get SSL errors when Django tries to contact Keycloak:** Add this variable too:
+- `OIDC_OP_JWKS_ENDPOINT` = `https://govasset-keycloak.up.railway.app/realms/govasset/protocol/openid-connect/certs`
+
+---
+##### Deploy Keycloak
+
+Keycloak runs as a Docker container on Railway.
+
+1. In the same Railway project → **New** → **Start a new service** → **Docker**
+2. For image, paste: `quay.io/keycloak/keycloak:26.1`
+3. In the **Settings** tab, set the **Port** to `8080` (Keycloak's default)
+4. In the **Variables** tab, add these environment variables:
+
+| Variable | Value | Why |
+|----------|-------|-----|
+| `KC_DB` | `postgres` | Tell Keycloak to use PostgreSQL |
+| `KC_DB_URL` | `jdbc:postgresql://...` (convert Railway's DATABASE_URL to JDBC format) | Keycloak's database connection |
+| `KC_DB_USERNAME` | (from Railway PostgreSQL, usually `postgres`) | Database user |
+| `KC_DB_PASSWORD` | (from Railway PostgreSQL) | Database password |
+| `KC_HOSTNAME` | `https://govasset-keycloak.up.railway.app` | Keycloak's public URL |
+| `KC_PROXY` | `edge` | Required behind Railway's proxy — without this, redirects break |
+| `KC_HTTP_ENABLED` | `true` | Allow HTTP internally (Railway handles HTTPS at edge) |
+| `KEYCLOAK_ADMIN` | `admin` | Admin username for Keycloak admin panel |
+| `KEYCLOAK_ADMIN_PASSWORD` | `Admin@123` (or a strong password) | Admin password |
+
+5. Deploy Keycloak. Your Keycloak URL: `https://govasset-keycloak.up.railway.app`
+6. Open the admin panel at `https://govasset-keycloak.up.railway.app/admin` and log in with `admin` / `Admin@123`
+
+---
+##### Configure both services after deployment
+
+**Step A — Import your Keycloak realm**
+
+Since your Keycloak locally has the `govasset` realm with clients and users, you have two options:
+
+**Option 1 — Export from local, import to Railway (best):**
+1. On your local Keycloak: go to **Realm Settings** → **Export** → download JSON
+2. On Railway Keycloak admin: go to **Add Realm** → upload the JSON file
+3. All your clients (govasset-django, group2-app) and users are imported
+
+**Option 2 — Recreate manually (if export fails):**
+1. Create the `govasset` realm
+2. Create the `govasset-django` client (Client authentication: ON, Standard flow: ON)
+3. Copy the Client Secret — you need this for Django's `KEYCLOAK_CLIENT_SECRET` env var
+4. Create the `group2-app` client for Group 2's SSO
+5. Create test users (moh_admin, mof_admin, etc.) in the realm
+
+**Step B — Update Django's env var with Keycloak secret**
+
+After fixing the Client Secret in Keycloak admin, update Django's environment variable:
+- `KEYCLOAK_CLIENT_SECRET` = (the copied secret)
+
+Railway will restart Django automatically when you change the variable.
+
+**Step C — Configure Keycloak redirect URIs**
+
+For each client in Keycloak:
+
+| Client | Setting | Value |
+|--------|---------|-------|
+| `govasset-django` | Valid Redirect URIs | `https://govasset-api.up.railway.app/*` |
+| `govasset-django` | Valid Post Logout Redirect URIs | `https://govasset-api.up.railway.app/*` |
+| `govasset-django` | Web Origins | `https://govasset-api.up.railway.app` |
+| `group2-app` | Valid Redirect URIs | `https://group2-callback-url.com/*` |
+| `group2-app` | Valid Post Logout Redirect URIs | `https://group2-callback-url.com/*` |
+
+---
+##### Verify everything works
+
+1. **Keycloak is up:** Visit `https://govasset-keycloak.up.railway.app/realms/govasset/` → should show realm info
+2. **Django is up:** Visit `https://govasset-api.up.railway.app/api/docs/` → should show Swagger
+3. **Login works:** Visit `https://govasset-api.up.railway.app/login/` → should redirect to Keycloak
+4. **API works:** Call `POST https://govasset-api.up.railway.app/api/auth/login/` with test credentials → should return token
+
+**Cost:** Free tier — all three services run 24/7. Your laptop can be off.
+
+---
+
+#### Fallback — ngrok for quick local testing (before Railway deployment)
+
+If you haven't deployed to Railway yet and need to test immediately, use ngrok. Note that **free ngrok only supports one tunnel** — you need two different tunneling tools for both services.
+
+**Option A — ngrok for Keycloak + bore/localtunnel for Django:**
+
+```
+Terminal 1: python manage.py runserver 0.0.0.0:8000
+Terminal 2: kc.bat start-dev --http-port=8180
+Terminal 3: ngrok http 8180                     → https://keycloak.ngrok-free.app
+Terminal 4: bore local 8000 --to bore.pub       → https://bore.pub:12345 (Django)
+```
+
+Install bore: download exe from https://github.com/ekzhang/bore/releases
+
+**Option B — Two separate ngrok binaries (different accounts):**
+```
+Terminal 3: ngrok http 8000   (MSIX store version)
+Terminal 4: C:\ngrok-cli\ngrok.exe http 8180  (standalone, 2nd account)
+```
+
+**Limitations of ngrok:**
+- URLs change every restart → must re-share with Group 2
+- Only one tunnel per ngrok instance on free plan
+- Your laptop must stay on for anyone to access
+
+**Hotspot (if groups are nearby):**
 ```powershell
-ngrok config add-authtoken YOUR_AUTH_TOKEN
-ngrok http 8000
-```
-
-You will see output like:
-```
-Forwarding  https://a1b2c3d4.ngrok-free.app → http://localhost:8000
-```
-
-**How ngrok works:** ngrok creates a secure tunnel from a public server on the internet to your local Django running on port 8000. When your friend visits `https://a1b2c3d4.ngrok-free.app/api/docs/`, the request travels:
-```
-Friend's browser → internet → ngrok's server → tunnel → your Django
-```
-
-**Limitations of free ngrok:**
-- URL changes every time you restart ngrok
-- 40 connections/minute limit (enough for testing)
-- Random subdomain name
-
-**Alternative — Hotspot (if groups are nearby):**
-```powershell
-# Connect everyone to your phone's hotspot
-# Start Django with 0.0.0.0
 python manage.py runserver 0.0.0.0:8000
-
-# Find your IP address
-ipconfig
-# Look for: IPv4 Address . . . . . : 192.168.x.x
-
-# Share: http://192.168.x.x:8000/api/docs/
+ipconfig  # Find your IP: 192.168.x.x
+# Share: http://192.168.x.x:8000/api/docs
 ```
 
 #### Step 3: Share this exact message on WhatsApp / Email
@@ -2929,11 +3076,13 @@ GOVASSET PLATFORM — API Integration Guide
 
 Dear Groups 2-10,
 
-Our authentication API is now ready for integration testing.
+Our authentication system is now live and accessible 24/7. Here are our permanent URLs:
 
-API Documentation (open this in your browser):
-https://a1b2c3d4.ngrok-free.app/api/docs/
-(Or use http://192.168.x.x:8000/api/docs/ if on same WiFi)
+Our Django API:   https://govasset-api.up.railway.app
+Our Keycloak SSO: https://govasset-keycloak.up.railway.app
+
+API Documentation:
+https://govasset-api.up.railway.app/api/docs/
 
 Test Accounts (all passwords: Admin@123):
   superadmin  — Super Admin (sees all ministries)
@@ -2943,13 +3092,22 @@ Test Accounts (all passwords: Admin@123):
   moh_auditor — Auditor (Ministry of Health)
   mof_admin   — Ministry Admin (Ministry of Finance)
 
-How to Integrate (3 steps):
-1. Call POST /api/auth/login/ with username + password
-2. Save the 'access' token from the response
-3. Call GET /api/auth/verify-token/ with header:
-   Authorization: Bearer <access_token>
+How to Integrate:
 
-Response you get from verify-token:
+Option A — If your group built a login page (Type B): Call our API directly
+  1. POST /api/auth/login/ with username + password
+  2. Save the 'access' token
+  3. GET /api/auth/verify-token/ to get user role + ministry
+
+Option B — If your group has NO login page (Type A): Use SSO
+  1. We register your app in Keycloak, give you Client ID + Secret
+  2. You redirect users to our Keycloak login page at: https://govasset-keycloak.up.railway.app/realms/govasset/protocol/openid-connect/auth
+  3. Keycloak sends them back to your callback URL with a token
+  4. You call GET /api/auth/verify-token/ at https://govasset-api.up.railway.app/api/auth/verify-token/ to get user role + ministry
+
+Choose whichever fits your group's architecture.
+
+Response you get from verify-token (both options):
 {
   "valid": true,
   "user": {
@@ -2991,7 +3149,7 @@ print(user['role'], user['ministry_schema'])
 ```
 
 **Q: "Do I need to install Keycloak?"**
-No. You only call our API endpoints. Keycloak is only for our web login flow.
+No. You never install Keycloak. If your group has no login page (Type A), your users will log in through OUR Keycloak page — we give you the redirect URL. If your group has its own login (Type B), you call our API directly — Keycloak is invisible to you.
 
 **Q: "What database should I use?"**
 Any database — MySQL, PostgreSQL, MongoDB, SQL Server. Your database is separate from ours. We only communicate via HTTP.
@@ -3023,6 +3181,61 @@ Yes and no. You use OUR users (via verify-token) for authentication. But if you 
 
 **Q: "What if your system is down?"**
 Contact us. During development, our server runs on our laptop — it goes offline when we close it. In production, it runs 24/7 on a cloud server.
+
+---
+
+### Hosting — How Group 2 Accesses Your System
+
+Group 2 cannot access `localhost:8000` or `localhost:8180` from their computer. You need to make your system accessible to them. Here are your options:
+
+| Option | Cost | Setup Time | URL Changes? | Best For |
+|--------|------|------------|-------------|----------|
+| **Railway** | Free tier | 2-3 hours | **No — permanent** | Recommended for integration |
+| **ngrok** | Free | 10 minutes | Yes — every restart | Quick local testing only |
+| **DigitalOcean / Linode** | $6-12/month | 3-4 hours | No — permanent | Full production demo |
+
+**Option 1 — Railway (RECOMMENDED — permanent URLs, 24/7 uptime)**
+
+Deploy both Django + Keycloak to Railway. Both get permanent URLs that never change. Group 2 configures once and never updates. Your laptop can be off. Full step-by-step instructions are in the "Step-by-Step" section above.
+
+**Pros:** Permanent URLs, 24/7 uptime, free tier, laptop can be off, PostgreSQL included.
+**Cons:** 30-45 minute setup time (one time only).
+
+**Option 2 — ngrok (fallback for quick local testing only)**
+
+ngrok creates temporary public URLs that tunnel to your localhost. Free plan only supports one tunnel at a time. Documented in the "Step 2 Fallback" section above.
+
+**Pros:** Works immediately, no hosting setup.
+**Cons:** URLs change every restart. Laptop must stay on.
+
+**Option 3 — VPS (if you want full control)**
+
+Rent a small Linux server ($6/month on DigitalOcean or Linode):
+
+```
+Server: 1 CPU, 1GB RAM, 25GB SSD
+  └── Install: Docker + Docker Compose
+      ├── Container 1: Django + Gunicorn
+      ├── Container 2: PostgreSQL
+      └── Container 3: Keycloak
+```
+
+**Pros:** Full control, everything runs on one machine, Docker Compose makes setup repeatable.
+**Cons:** Costs money, requires Linux command line knowledge.
+
+**My recommendation for your presentation timeline:**
+1. **Today/Tomorrow:** Deploy to Railway (permanent URLs), then share with Group 2
+2. **This week:** Deploy to Railway or a VPS for a permanent URL
+3. **Before panel:** Have the permanent URL ready so you demo from the cloud, not localhost
+
+Once hosted, update these in your documentation and share with Group 2:
+
+| What to update | Old value | New value |
+|---------------|-----------|-----------|
+| Keycloak Auth URL | `http://localhost:8180/...` | `https://your-app.up.railway.app/...` |
+| Django API URL | `http://localhost:8000/...` | `https://your-api.up.railway.app/...` |
+| Client redirect URI | `http://localhost:3000/callback` | `https://group2-system.com/callback` |
+| WhatsApp message template | localhost URLs | live URLs |
 
 ---
 
@@ -3310,7 +3523,7 @@ The panel wants to know:
 
 Memorize this paragraph. It covers authentication, tokens, multi-tenancy, and audit in one confident answer:
 
-> *"Our system has two types of users: web browser users and API users. Web users log in through Keycloak, which handles password checking and brute-force lockout. API users, including our mobile app and other groups' systems, log in through our own API endpoint, which has its own five-attempt lockout using our LoginAttempt model. Both types of login produce a JWT token containing the user's identity, role, and ministry. Every subsequent request attaches that token, and our permission classes check it before any data is touched. The multi-tenancy middleware switches the database to the correct ministry's private schema before any query runs. Every action is permanently recorded in an audit log that cannot be modified or deleted by anyone, including the Super Admin. This is all configured in settings.py, oidc_backend.py, api_views.py, and the models in tenants and organizations."*
+> *"Our system supports two authentication paths. Web browser users log in through Keycloak SSO, which handles password checking and brute-force lockout. Other groups' users either go through the same Keycloak SSO (if their group has no login page) or authenticate via our API endpoint (if their group has their own login form). Both paths produce a JWT token containing the user's identity, role, and ministry. Every subsequent request attaches that token, and our permission classes check it before any data is touched. The multi-tenancy middleware switches the database to the correct ministry's private schema before any query runs. Every action is permanently recorded in an audit log that cannot be modified or deleted by anyone, including the Super Admin. This is all configured in settings.py, oidc_backend.py, api_views.py, and the models in tenants and organizations."*
 
 This answer covers Keycloak, JWT, brute-force, multi-tenancy, and audit — everything they are likely to ask about.
 
@@ -5495,7 +5708,7 @@ Group 1 is not just one module among ten. **Group 1 is the platform that every o
 
 **What Group 1 provides to everyone else:**
 
-1. **Authentication** — Every user in every group must log in through our Keycloak SSO. No other group has their own login page.
+1. **Authentication** — Every user in every group is authenticated by our system. Groups without their own login use our Keycloak SSO page directly. Groups with their own login call our API endpoint — but the user is still verified against our database and role system. Either way, we are the sole authentication provider.
 2. **Authorization (RBAC)** — Our 5-role system (Super Admin → Facility Clerk) controls what each user can access. Groups 2-10 simply check "what role does this user have?"
 3. **Multi-Tenant Isolation** — Each ministry's data is in a separate PostgreSQL schema. Groups 2-10 never see data from other ministries. Our django-tenants setup makes this automatic.
 4. **API Security (JWT)** — Our SimpleJWT configuration issues tokens that all other groups use to authenticate API calls. The `/api/auth/verify-token/` endpoint is how Groups 2-10 validate users.
@@ -5592,7 +5805,7 @@ Any group can call this endpoint with a user's JWT token and instantly know thei
 
 **If they ask: "What if another group wants to add their own login?"**
 
-> *"That would defeat the purpose of SSO. Our Keycloak is the single entry point for the entire system. If another group created their own login, users would need multiple credentials and the audit trail would be broken. The project design explicitly makes Group 1 the sole authentication provider."*
+> *"They have two options. If their users don't mind leaving their site to authenticate, they use our Keycloak SSO — the user sees one unified government login across all 10 groups. If they want users to stay on their own site, their backend calls our API login endpoint directly — the user never leaves their site. In both cases, authentication still goes through us. We are the sole authentication provider — users are always verified against our database and our role system."*
 
 **If they ask: "How do you handle data isolation between ministries?"**
 

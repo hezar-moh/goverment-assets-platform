@@ -1,6 +1,7 @@
 django
 django-tenants
 djangorestframework
+gunicorn
 djangorestframework-simplejwt
 mozilla-django-oidc
 django-cors-headers
