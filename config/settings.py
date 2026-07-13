@@ -22,7 +22,9 @@ ALLOWED_HOSTS = [
     '172.16.20.232',
     '10.187.165.150',
     '10.103.10.150', # my laptop WiFi IP for mobile access
+    '.ngrok-free.dev',  # For testing with ngrok
 ]
+# or we can use ALLOWED_HOSTS = ['*'] for development, but in production we should use specific domains only
 
 SHARED_APPS = [
     'django_tenants',
@@ -373,8 +375,6 @@ OIDC_RP_SIGN_ALGO = 'RS256'
 OIDC_AUTHENTICATE_CLASS = 'mozilla_django_oidc.views.OIDCAuthenticationRequestView'
 OIDC_AUTHENTICATION_CALLBACK_CLASS = 'mozilla_django_oidc.views.OIDCAuthenticationCallbackView'
 
-LOGIN_REDIRECT_URL  = '/dashboard/'
-LOGOUT_REDIRECT_URL = '/login/'
 LOGIN_REDIRECT_URL_FAILURE = '/login/?error=auth_failed'
 
 OIDC_USE_PKCE = True
@@ -388,3 +388,31 @@ AUTHENTICATION_BACKENDS = [
     'authentication.oidc_backend.GovAssetOIDCBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
+
+# ── Email Configuration ─────────────────────────────────────────────────────
+# In development: emails print to console (no real email sent)
+# In production: change EMAIL_BACKEND and configure SMTP credentials
+EMAIL_BACKEND = config(
+    'EMAIL_BACKEND',
+    default='django.core.mail.backends.console.EmailBackend'
+)
+EMAIL_HOST          = config('EMAIL_HOST',          default='smtp.gmail.com')
+EMAIL_PORT          = config('EMAIL_PORT',           default=587, cast=int)
+EMAIL_USE_TLS       = config('EMAIL_USE_TLS',        default=True, cast=bool)
+EMAIL_HOST_USER     = config('EMAIL_HOST_USER',      default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD',  default='')
+DEFAULT_FROM_EMAIL  = config(
+    'DEFAULT_FROM_EMAIL',
+    default='GovAsset Platform <noreply@govasset.go.tz>'
+)
+
+# Base URL for email links — change to real domain in production
+PLATFORM_BASE_URL = config(
+    'PLATFORM_BASE_URL',
+    default='http://localhost:8000'
+)
+
+# ── Brute Force Protection Settings ─────────────────────────────────────────
+LOGIN_MAX_WARNINGS     = config('LOGIN_MAX_WARNINGS',     default=3,  cast=int)
+LOGIN_MAX_ATTEMPTS     = config('LOGIN_MAX_ATTEMPTS',     default=5,  cast=int)
+LOGIN_COOLDOWN_MINUTES = config('LOGIN_COOLDOWN_MINUTES', default=5,  cast=int)

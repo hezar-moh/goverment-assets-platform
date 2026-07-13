@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ page_title }} — GovAsset</title>
+  {% load static %}
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="{% static 'css/style.css' %}" rel="stylesheet">
+  <style>
+    body { background: #f1f5f9; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 24px; }
+    .unlock-card { background: #fff; border-radius: 14px; padding: 48px 40px; max-width: 480px; width: 100%; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    .unlock-icon { width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 32px; }
+    .unlock-icon.success { background: #f0fdf4; color: #16a34a; }
+    .unlock-icon.fail { background: #fef2f2; color: #dc2626; }
+    .unlock-title { font-size: 22px; font-weight: 800; margin-bottom: 12px; }
+    .unlock-title.success { color: #16a34a; }
+    .unlock-title.fail { color: #dc2626; }
+    .unlock-message { color: #475569; margin-bottom: 24px; line-height: 1.7; font-size: 14px; }
+    .unlock-btn { display: inline-block; padding: 12px 32px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; transition: all 0.15s; }
+    .unlock-btn.primary { background: #2563eb; color: #fff; }
+    .unlock-btn.primary:hover { background: #1d4ed8; }
+    .unlock-btn.secondary { background: #6b7280; color: #fff; }
+    .unlock-btn.secondary:hover { background: #4b5563; }
+  </style>
+</head>
+<body>
+  <div class="unlock-card">
+    {% if success %}
+    <div class="unlock-icon success"><i class="bi bi-check-circle-fill"></i></div>
+    <h2 class="unlock-title success">{{ page_title }}</h2>
+    <p class="unlock-message">{{ message }}</p>
+    <a href="{% url 'login' %}" class="unlock-btn primary">
+      <i class="bi bi-box-arrow-in-right"></i> Go to Login
+    </a>
+    {% else %}
+    <div class="unlock-icon fail"><i class="bi bi-x-circle-fill"></i></div>
+    <h2 class="unlock-title fail">{{ page_title }}</h2>
+    <p class="unlock-message">{{ message }}</p>
+    <a href="{% url 'login' %}" class="unlock-btn secondary">
+      <i class="bi bi-arrow-left"></i> Back to Login
+    </a>
+    {% endif %}
+  </div>
+</body>
+</html>

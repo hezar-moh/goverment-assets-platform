@@ -38,7 +38,7 @@
       </thead>
       <tbody>
         {% for u in users %}
-        <tr style="{% if not u.is_active %}opacity:0.55;{% endif %}">
+        <tr style="{% if not u.is_active or u.is_locked %}opacity:0.55;{% endif %}">
           <td>
             <div class="user-cell">
               <div class="avatar
@@ -70,8 +70,18 @@
           </td>
           <td><code>{{ u.ministry_schema|default:"—" }}</code></td>
           <td>
-            <span class="status-dot {% if u.is_active %}active{% else %}inactive{% endif %}"></span>
-            {% if u.is_active %}Active{% else %}Inactive{% endif %}
+            <div style="display:flex;align-items:center;gap:6px;">
+              {% if u.is_locked %}
+                <span class="status-dot" style="background:#d97706;"></span>
+                <span style="color:#d97706;font-weight:600;font-size:12.5px;">Locked</span>
+              {% elif u.is_active %}
+                <span class="status-dot active"></span>
+                Active
+              {% else %}
+                <span class="status-dot inactive"></span>
+                Inactive
+              {% endif %}
+            </div>
           </td>
           <td style="color:var(--text-muted);font-size:12.5px;">
             {{ u.date_joined|date:"d M Y" }}
@@ -92,12 +102,13 @@
                 {% if u.role != 'SUPER_ADMIN' or editor_role == 'SUPER_ADMIN' %}
                 <form method="post" action="{% url 'user_toggle_active' u.id %}"
                       style="display:inline;"
-                      onsubmit="return confirm('{% if u.is_active %}Deactivate{% else %}Activate{% endif %} {{ u.username }}?')">
+                      onsubmit="return confirm('{% if u.is_locked %}Unlock{% elif u.is_active %}Deactivate{% else %}Activate{% endif %} {{ u.username }}?')">
                   {% csrf_token %}
                   <button type="submit"
-                          class="btn btn-sm btn-icon {% if u.is_active %}btn-danger-outline{% else %}btn-outline{% endif %}"
-                          title="{% if u.is_active %}Deactivate{% else %}Activate{% endif %}">
-                    <i class="bi bi-{% if u.is_active %}person-slash{% else %}person-check{% endif %}"></i>
+                          class="btn btn-sm btn-icon {% if u.is_locked %}{% elif u.is_active %}btn-danger-outline{% else %}btn-outline{% endif %}"
+                          {% if u.is_locked %}style="color:#d97706;border-color:#d97706;"{% endif %}
+                          title="{% if u.is_locked %}Unlock{% elif u.is_active %}Deactivate{% else %}Activate{% endif %}">
+                    <i class="bi bi-{% if u.is_locked %}unlock{% elif u.is_active %}person-slash{% else %}person-check{% endif %}"></i>
                   </button>
                 </form>
                 {% endif %}

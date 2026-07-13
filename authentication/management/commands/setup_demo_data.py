@@ -6,31 +6,28 @@ from datetime import date, timedelta
 
 class Command(BaseCommand):
     """
-    Management command to clean test data and insert
-    professional demo data for supervisor presentation.
+    Reset and seed professional demo data for presentations.
+
+    Creates 6 users (Django only or Django + Keycloak), 5 asset categories,
+    2 org units, 13 assets, and audit logs across 2 ministries.
 
     Usage:
-        python manage.py setup_demo_data          ← clean + seed
-        python manage.py setup_demo_data --clean  ← clean only
-        python manage.py setup_demo_data --seed   ← seed only
+        python manage.py setup_demo_data               # full reset + Keycloak sync
+        python manage.py setup_demo_data --no-keycloak  # full reset, skip Keycloak
+        python manage.py setup_demo_data --clean         # clean only
+        python manage.py setup_demo_data --seed          # seed only (no clean)
     """
     help = 'Clean test data and seed professional demo data'
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            '--clean',
-            action='store_true',
-            help='Only clean existing data',
-        )
-        parser.add_argument(
-            '--seed',
-            action='store_true',
-            help='Only seed demo data (without cleaning)',
-        )
+        parser.add_argument('--clean', action='store_true', help='Only clean existing data')
+        parser.add_argument('--seed', action='store_true', help='Only seed demo data (without cleaning)')
+        parser.add_argument('--no-keycloak', action='store_true', help='Skip Keycloak user creation')
 
     def handle(self, *args, **options):
         clean_only = options['clean']
         seed_only  = options['seed']
+        self.sync_keycloak = not options['no_keycloak']
 
         if not seed_only:
             self._clean_data()
@@ -39,7 +36,7 @@ class Command(BaseCommand):
             self._seed_data()
 
         self.stdout.write(
-            self.style.SUCCESS('\n✓ Demo data setup complete!')
+            self.style.SUCCESS('\n[OK] Demo data setup complete!')
         )
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -49,16 +46,7 @@ class Command(BaseCommand):
     def _clean_data(self):
         self.stdout.write('\nCleaning test data...')
 
-        # Clean public schema tables
-        from authentication.models import LoginAttempt, PendingAccess
-
-        deleted = LoginAttempt.objects.all().delete()
-        self.stdout.write(f'  ✓ Cleared login attempts: {deleted[0]}')
-
-        deleted = PendingAccess.objects.all().delete()
-        self.stdout.write(f'  ✓ Cleared pending access: {deleted[0]}')
-
-        # Clean tenant schemas
+        # Clean tenant schemas first (assets, audit logs)
         from tenants.models import Ministry
         ministries = Ministry.objects.exclude(schema_name='public')
 
@@ -67,23 +55,32 @@ class Command(BaseCommand):
                 from assets.models import Asset
                 from organizations.models import AuditLog
 
-                # Delete all assets
                 asset_count = Asset.objects.count()
                 Asset.objects.all().delete()
-                self.stdout.write(
-                    f'  ✓ Cleared {asset_count} assets '
-                    f'from {ministry.schema_name}'
-                )
 
-                # Delete all audit logs
                 log_count = AuditLog.objects.count()
                 AuditLog.admin_bulk_delete()
 
-                
                 self.stdout.write(
-                    f'  ✓ Cleared {log_count} audit logs '
-                    f'from {ministry.schema_name}'
+                    f'  [OK] Cleared {asset_count} assets + '
+                    f'{log_count} logs from {ministry.schema_name}'
                 )
+
+        # Clean public schema tables
+        from authentication.models import LoginAttempt, PendingAccess
+
+        deleted = LoginAttempt.objects.all().delete()
+        self.stdout.write(f'  [OK] Cleared login attempts: {deleted[0]}')
+
+        deleted = PendingAccess.objects.all().delete()
+        self.stdout.write(f'  [OK] Cleared pending access: {deleted[0]}')
+
+        # Delete all users — the seed step will recreate the 6 demo users.
+        # This guarantees a predictable state after running setup_demo_data.
+        from authentication.models import CustomUser
+        total_users = CustomUser.objects.count()
+        CustomUser.objects.all().delete()
+        self.stdout.write(f'  [OK] Deleted {total_users} users (will recreate demo users)')
 
         self.stdout.write(self.style.SUCCESS('  Cleaning complete.'))
 
@@ -93,9 +90,187 @@ class Command(BaseCommand):
 
     def _seed_data(self):
         self.stdout.write('\nSeeding demo data...')
+        self._seed_categories()
+        self._seed_org_units()
+        self._seed_users()
         self._seed_moh_data()
         self._seed_mof_data()
         self.stdout.write(self.style.SUCCESS('  Seeding complete.'))
+
+    def _seed_categories(self):
+        """Create asset categories in every tenant schema (idempotent)."""
+        from tenants.models import Ministry
+        categories = [
+            ('ICT',     'ICT Equipment'),
+            ('VEH',     'Vehicle'),
+            ('FURN',    'Furniture & Fixtures'),
+            ('MEDICAL', 'Medical Equipment'),
+            ('LAND',    'Land & Buildings'),
+        ]
+        schemas = list(
+            Ministry.objects.exclude(schema_name='public')
+            .values_list('schema_name', flat=True)
+        )
+        for schema_name in schemas:
+            with schema_context(schema_name):
+                from assets.models import AssetCategory
+                for code, name in categories:
+                    AssetCategory.objects.get_or_create(
+                        code=code, defaults={'name': name}
+                    )
+        self.stdout.write(
+            f'  [OK] Ensured {len(categories)} categories in {len(schemas)} schemas'
+        )
+
+    def _seed_org_units(self):
+        """Create org units in each ministry schema (idempotent)."""
+        from tenants.models import Ministry
+        ministries = Ministry.objects.exclude(schema_name='public')
+
+        for ministry in ministries:
+            with schema_context(ministry.schema_name):
+                from organizations.models import OrgUnit
+
+                if ministry.schema_name == 'moh_schema':
+                    # Get or create ministry-level first (parent for agencies)
+                    moh_unit, _ = OrgUnit.objects.get_or_create(
+                        code='MOH',
+                        defaults={
+                            'name': 'Ministry of Health',
+                            'unit_type': 'MINISTRY',
+                        }
+                    )
+                    mnh, _ = OrgUnit.objects.get_or_create(
+                        code='MNH',
+                        defaults={
+                            'name': 'Muhimbili National Hospital',
+                            'unit_type': 'AGENCY',
+                            'parent': moh_unit,
+                        }
+                    )
+                    OrgUnit.objects.get_or_create(
+                        code='RAD',
+                        defaults={
+                            'name': 'Radiology Department',
+                            'unit_type': 'FACILITY',
+                            'parent': mnh,
+                        }
+                    )
+                elif ministry.schema_name == 'mof_schema':
+                    OrgUnit.objects.get_or_create(
+                        code='MOF',
+                        defaults={
+                            'name': 'Ministry of Finance',
+                            'unit_type': 'MINISTRY',
+                        }
+                    )
+
+        self.stdout.write('  [OK] Ensured org units exist in each schema')
+
+    def _seed_users(self):
+        """Create demo users in Django (and optionally Keycloak)."""
+        from authentication.models import CustomUser
+
+        users_data = [
+            {
+                'username': 'superadmin',
+                'password': 'Admin@123',
+                'email': 'superadmin@platform.go.tz',
+                'first_name': 'System',
+                'last_name': 'Administrator',
+                'role': 'SUPER_ADMIN',
+                'ministry_schema': None,
+                'is_staff': True,
+                'is_superuser': True,
+            },
+            {
+                'username': 'moh_admin',
+                'password': 'Admin@123',
+                'email': 'amina@moh.go.tz',
+                'first_name': 'Amina',
+                'last_name': 'Hassan',
+                'role': 'MINISTRY_ADMIN',
+                'ministry_schema': 'moh_schema',
+            },
+            {
+                'username': 'mnh_manager',
+                'password': 'Admin@123',
+                'email': 'john.mwangi@moh.go.tz',
+                'first_name': 'John',
+                'last_name': 'Mwangi',
+                'role': 'AGENCY_MANAGER',
+                'ministry_schema': 'moh_schema',
+            },
+            {
+                'username': 'rad_clerk',
+                'password': 'Admin@123',
+                'email': 'asha.salum@moh.go.tz',
+                'first_name': 'Asha',
+                'last_name': 'Salum',
+                'role': 'FACILITY_CLERK',
+                'ministry_schema': 'moh_schema',
+            },
+            {
+                'username': 'moh_auditor',
+                'password': 'Admin@123',
+                'email': 'david.mushi@moh.go.tz',
+                'first_name': 'David',
+                'last_name': 'Mushi',
+                'role': 'AUDITOR',
+                'ministry_schema': 'moh_schema',
+            },
+            {
+                'username': 'mof_admin',
+                'password': 'Admin@123',
+                'email': 'grace@mof.go.tz',
+                'first_name': 'Grace',
+                'last_name': 'Mbwilo',
+                'role': 'MINISTRY_ADMIN',
+                'ministry_schema': 'mof_schema',
+            },
+        ]
+
+        # Delete existing demo users so IDs reset cleanly each run
+        demo_usernames = [u['username'] for u in users_data]
+        CustomUser.objects.filter(username__in=demo_usernames).delete()
+
+        for info in users_data:
+            password = info.pop('password')
+            keycloak_id = None
+
+            # Create in Keycloak first (if enabled)
+            if self.sync_keycloak:
+                try:
+                    from authentication.keycloak_admin import KeycloakAdminService
+                    kc = KeycloakAdminService()
+                    # Delete existing Keycloak user first to avoid 409 conflict
+                    existing_id = kc.get_user_id(info['username'])
+                    if existing_id:
+                        kc.delete_user(existing_id)
+                    keycloak_id = kc.create_user(
+                        username=info['username'],
+                        email=info.get('email', ''),
+                        first_name=info.get('first_name', ''),
+                        last_name=info.get('last_name', ''),
+                        password=password,
+                        role=info['role'],
+                        ministry_schema=info.get('ministry_schema', '') or '',
+                    )
+                except Exception as e:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f'  Warning: Keycloak sync failed for '
+                            f'{info["username"]}: {e}'
+                        )
+                    )
+
+            user = CustomUser(**info, keycloak_id=keycloak_id)
+            user.set_password(password)
+            user.save()
+            kc_status = ' + Keycloak' if keycloak_id else ''
+            self.stdout.write(
+                f'  [OK] Created user: {user.username}{kc_status}'
+            )
 
     def _seed_moh_data(self):
         self.stdout.write('\n  Seeding Ministry of Health (moh_schema)...')
@@ -104,38 +279,15 @@ class Command(BaseCommand):
             from assets.models import Asset, AssetCategory
             from organizations.models import AuditLog, OrgUnit
 
-            # Get categories
-            try:
-                ict  = AssetCategory.objects.get(code='ICT')
-                veh  = AssetCategory.objects.get(code='VEH')
-                furn = AssetCategory.objects.get(code='FURN')
-                med  = AssetCategory.objects.get(
-                    name__icontains='Medical'
-                )
-            except AssetCategory.DoesNotExist:
-                self.stdout.write(
-                    self.style.WARNING(
-                        '  Warning: Some categories not found. '
-                        'Run master data seed first.'
-                    )
-                )
-                return
-
-            # Get org units
-            try:
-                mnh = OrgUnit.objects.filter(
-                    unit_type='AGENCY'
-                ).first()
-                rad = OrgUnit.objects.filter(
-                    unit_type='FACILITY'
-                ).first()
-            except Exception:
-                mnh = None
-                rad = None
-
             today = date.today()
+            ict  = AssetCategory.objects.get(code='ICT')
+            veh  = AssetCategory.objects.get(code='VEH')
+            furn = AssetCategory.objects.get(code='FURN')
+            med  = AssetCategory.objects.get(code='MEDICAL')
 
-            # ── ICT Assets ───────────────────────────────────────────────
+            mnh = OrgUnit.objects.filter(unit_type='AGENCY').first()
+            rad = OrgUnit.objects.filter(unit_type='FACILITY').first()
+
             Asset.objects.create(
                 asset_number='MOH-ICT-2025-0001',
                 name='Dell Laptop Latitude 5540',
@@ -232,7 +384,6 @@ class Command(BaseCommand):
                 location_description='Board Room Floor 3',
                 acquisition_date=date(2024, 1, 20),
                 warranty_expiry_date=date(2026, 1, 20),
-                # Warranty expiring soon — good for demo
                 asset_expiry_date=date(2034, 1, 20),
                 useful_life_years=10,
                 acquisition_cost=1800000.00,
@@ -244,7 +395,6 @@ class Command(BaseCommand):
                 registered_by_name='Amina Hassan',
             )
 
-            # ── Vehicle Assets ────────────────────────────────────────────
             Asset.objects.create(
                 asset_number='MOH-VEH-2023-0001',
                 name='Toyota Land Cruiser Prado 150',
@@ -285,7 +435,6 @@ class Command(BaseCommand):
                 location_description='TMDA Workshop Dar es Salaam',
                 acquisition_date=date(2022, 3, 15),
                 warranty_expiry_date=date(2024, 3, 15),
-                # Warranty already expired — good for expired demo
                 asset_expiry_date=date(2032, 3, 15),
                 useful_life_years=10,
                 acquisition_cost=65000000.00,
@@ -297,7 +446,6 @@ class Command(BaseCommand):
                 registered_by_name='Amina Hassan',
             )
 
-            # ── Medical Equipment ─────────────────────────────────────────
             Asset.objects.create(
                 asset_number='MOH-MED-2024-0001',
                 name='Mindray BC-5300 Auto Haematology Analyzer',
@@ -315,10 +463,7 @@ class Command(BaseCommand):
                 org_unit_name=rad.name if rad else '',
                 acquisition_date=date(2024, 9, 1),
                 warranty_expiry_date=date(2026, 9, 1),
-                asset_expiry_date=date(today.year, today.month + 1, 1)
-                    if today.month < 12
-                    else date(today.year + 1, 1, 1),
-                # Expiring next month — good for warning demo
+                asset_expiry_date=date(today.year + 1, 1, 1),
                 useful_life_years=8,
                 acquisition_cost=45000000.00,
                 current_value=42000000.00,
@@ -356,7 +501,6 @@ class Command(BaseCommand):
                 registered_by_name='John Mwangi',
             )
 
-            # ── Furniture ─────────────────────────────────────────────────
             Asset.objects.create(
                 asset_number='MOH-FURN-2025-0001',
                 name='Executive Office Desk Set (8 Pieces)',
@@ -381,32 +525,20 @@ class Command(BaseCommand):
                 registered_by_name='Amina Hassan',
             )
 
-            # Create audit logs for demo
             self._create_demo_audit_logs('moh_schema')
 
             count = Asset.objects.count()
-            self.stdout.write(
-                f'  ✓ Created {count} MOH assets'
-            )
+            self.stdout.write(f'  [OK] Created {count} MOH assets')
 
     def _seed_mof_data(self):
         self.stdout.write('\n  Seeding Ministry of Finance (mof_schema)...')
 
         with schema_context('mof_schema'):
             from assets.models import Asset, AssetCategory
-            from organizations.models import OrgUnit
 
-            try:
-                ict  = AssetCategory.objects.get(code='ICT')
-                furn = AssetCategory.objects.get(code='FURN')
-                veh  = AssetCategory.objects.get(code='VEH')
-            except AssetCategory.DoesNotExist:
-                self.stdout.write(
-                    self.style.WARNING(
-                        '  Warning: Categories not found in mof_schema.'
-                    )
-                )
-                return
+            ict  = AssetCategory.objects.get(code='ICT')
+            furn = AssetCategory.objects.get(code='FURN')
+            veh  = AssetCategory.objects.get(code='VEH')
 
             Asset.objects.create(
                 asset_number='MOF-ICT-2025-0001',
@@ -509,41 +641,44 @@ class Command(BaseCommand):
             self._create_demo_audit_logs('mof_schema')
 
             count = Asset.objects.count()
-            self.stdout.write(f'  ✓ Created {count} MOF assets')
+            self.stdout.write(f'  [OK] Created {count} MOF assets')
 
     def _create_demo_audit_logs(self, schema_name):
         with schema_context(schema_name):
             from organizations.models import AuditLog
 
+            is_moh = 'moh' in schema_name
+            reviewer_id = 3 if is_moh else 6
+            reviewer_name = 'John Mwangi' if is_moh else 'Grace Mbwilo'
+            admin_id = 2 if is_moh else 6
+            admin_name = 'Amina Hassan' if is_moh else 'Grace Mbwilo'
+            prefix = schema_name[:3].upper()
+
             logs = [
                 {
-                    'performed_by_id':   2,
-                    'performed_by_name': 'Amina Hassan'
-                        if 'moh' in schema_name else 'Grace Mbwilo',
-                    'action':     'LOGIN',
+                    'performed_by_id': admin_id,
+                    'performed_by_name': admin_name,
+                    'action': 'LOGIN',
                     'model_name': 'CustomUser',
-                    'object_id':  '2',
-                    'object_repr': 'moh_admin'
-                        if 'moh' in schema_name else 'mof_admin',
+                    'object_id': str(admin_id),
+                    'object_repr': 'moh_admin' if is_moh else 'mof_admin',
                     'ip_address': '192.168.100.18',
                 },
                 {
-                    'performed_by_id':   2,
-                    'performed_by_name': 'Amina Hassan'
-                        if 'moh' in schema_name else 'Grace Mbwilo',
-                    'action':     'CREATE',
+                    'performed_by_id': admin_id,
+                    'performed_by_name': admin_name,
+                    'action': 'CREATE',
                     'model_name': 'Asset',
-                    'object_id':  '1',
-                    'object_repr': f'{schema_name[:3].upper()}-ICT-2025-0001',
+                    'object_id': '1',
+                    'object_repr': f'{prefix}-ICT-2025-0001',
                     'ip_address': '192.168.100.18',
                 },
                 {
-                    'performed_by_id':   3,
-                    'performed_by_name': 'John Mwangi'
-                        if 'moh' in schema_name else 'Grace Mbwilo',
-                    'action':     'UPDATE',
+                    'performed_by_id': reviewer_id,
+                    'performed_by_name': reviewer_name,
+                    'action': 'UPDATE',
                     'model_name': 'Asset',
-                    'object_id':  '1',
+                    'object_id': '1',
                     'object_repr': 'Updated condition to GOOD',
                     'ip_address': '192.168.100.18',
                 },

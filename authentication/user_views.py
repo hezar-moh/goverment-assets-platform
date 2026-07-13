@@ -1,6 +1,6 @@
 # Purpose: Web views for user management — list, create, edit, toggle active, and reset passwords.
 
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, redirect
 from django.contrib import messages
 from .models import CustomUser
 from .decorators import login_required_custom, role_required
@@ -11,7 +11,7 @@ logger = logging.getLogger('authentication')
 @login_required_custom
 @role_required("SUPER_ADMIN", "MINISTRY_ADMIN", "AGENCY_MANAGER")
 def user_list_view(request):
-    """Show users the current user can see. Super Admin sees everyone; others see only their ministry."""
+    """Show users the current user can see. Auto-syncs is_active status FROM Keycloak on page load."""
     user = request.user
 
     if user.role == 'SUPER_ADMIN':
@@ -22,6 +22,34 @@ def user_list_view(request):
             ministry_schema=user.ministry_schema
         ).order_by('role', 'username')
         can_create = user.role in ['MINISTRY_ADMIN', 'AGENCY_MANAGER']
+
+    # ── Auto-sync is_active FROM Keycloak on every page load ─────────
+    # Fetch ALL Keycloak users in one batch, build a dict by keycloak_id,
+    # then update any Django users whose is_active doesn't match.
+    try:
+        from authentication.keycloak_admin import KeycloakAdminService
+        kc = KeycloakAdminService()
+        all_kc_users = kc.get_all_users()
+        kc_status = {
+            u['id']: u.get('enabled', True)
+            for u in all_kc_users if 'id' in u
+        }
+
+        # Only sync users that have a keycloak_id AND are on the current page
+        for django_user in qs:
+            if django_user.keycloak_id and django_user.keycloak_id in kc_status:
+                kc_enabled = kc_status[django_user.keycloak_id]
+                if kc_enabled != django_user.is_active:
+                    old_active = django_user.is_active
+                    django_user.is_active = kc_enabled
+                    django_user.save(update_fields=['is_active'])
+                    logger.info(
+                        f"Auto-sync: {django_user.username} "
+                        f"is_active {old_active} -> {kc_enabled} (from Keycloak)"
+                    )
+    except Exception:
+        # If Keycloak is unreachable, just show the page without syncing
+        pass
 
     from authentication.pagination import paginate_queryset
     page, paginator = paginate_queryset(qs, request, per_page=20)
@@ -364,8 +392,10 @@ def user_toggle_active_view(request, user_id):
 
     old_status = target_user.is_active
 
-    # Toggle the active status
+    # Toggle the active status; also clear is_locked if re-enabling
     target_user.is_active = not target_user.is_active
+    if target_user.is_active and target_user.is_locked:
+        target_user.is_locked = False
     target_user.save()
 
     # Sync active status to Keycloak
@@ -548,3 +578,78 @@ def _log_user_action(schema_name, editor, action, target_user,
             )
     except Exception:
         pass
+
+
+def _sync_user_from_keycloak(request, user):
+    """
+    Sync a Django user's is_active status FROM Keycloak.
+    
+    Returns a dict: {'changed': True/False, 'error': '...' or None}
+    """
+    if not user.keycloak_id:
+        return {'changed': False, 'error': 'No Keycloak ID linked to this user.'}
+
+    from authentication.keycloak_admin import KeycloakAdminService
+    try:
+        kc = KeycloakAdminService()
+        kc_user = kc.get_user(user.keycloak_id)
+        if kc_user is None:
+            return {'changed': False, 'error': 'User not found in Keycloak.'}
+
+        kc_enabled = kc_user.get('enabled', True)
+        old_active = user.is_active
+
+        # Update is_active to match Keycloak's enabled status
+        if kc_enabled != user.is_active:
+            user.is_active = kc_enabled
+            user.save(update_fields=['is_active'])
+            _log_user_action(
+                schema_name=user.ministry_schema,
+                editor=request.user,
+                action='UPDATE',
+                target_user=user,
+                old_value={'is_active': old_active},
+                new_value={'is_active': user.is_active},
+                request=request,
+            )
+            return {'changed': True, 'error': None}
+
+        return {'changed': False, 'error': None}
+
+    except Exception as e:
+        return {'changed': False, 'error': str(e)}
+
+
+@login_required_custom
+@role_required('SUPER_ADMIN', 'MINISTRY_ADMIN')
+def user_sync_from_keycloak_view(request, user_id):
+    """Sync a single user's active status FROM Keycloak. POST only."""
+    if request.method != 'POST':
+        return redirect('user_list')
+
+    try:
+        user = CustomUser.objects.get(id=user_id)
+    except CustomUser.DoesNotExist:
+        messages.error(request, 'User not found.')
+        return redirect('user_list')
+
+    # Permission check: Ministry Admin can only sync their own ministry
+    if request.user.role == 'MINISTRY_ADMIN':
+        if user.ministry_schema != request.user.ministry_schema:
+            messages.error(request, 'You can only sync users in your own ministry.')
+            return redirect('user_list')
+
+    result = _sync_user_from_keycloak(request, user)
+
+    if result['error']:
+        messages.warning(request, f'Sync from Keycloak failed: {result["error"]}')
+    elif result['changed']:
+        action = 'activated' if user.is_active else 'deactivated'
+        messages.success(
+            request,
+            f"User '{user.username}' synced from Keycloak. Status: {action}."
+        )
+    else:
+        messages.info(request, f"User '{user.username}' is already in sync with Keycloak.")
+
+    return redirect('user_list')

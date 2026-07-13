@@ -1,7 +1,9 @@
 # Purpose: Defines CustomUser, PendingAccess, and LoginAttempt models for authentication.
 
+import uuid
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils import timezone
 
 
 class CustomUser(AbstractUser):
@@ -38,6 +40,14 @@ class CustomUser(AbstractUser):
     )
 
     phone = models.CharField(max_length=20, blank=True, null=True)
+
+    # Brute force lockout — separate from is_active so admin deactivation
+    # and automatic lockout are distinguishable
+    is_locked = models.BooleanField(
+        default=False,
+        help_text="Locked by brute force protection after too many failed attempts",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -120,48 +130,117 @@ class PendingAccess(models.Model):
 
 
 class LoginAttempt(models.Model):
-    """Tracks failed logins per username+IP. Locks the account after 5 failed attempts for 15 minutes."""
+    """Tracks failed login attempts per username+IP with progressive lockout.
 
-    MAX_ATTEMPTS = 5  # Failed attempts before lockout
-    LOCKOUT_MINUTES = 15  # How long the lockout lasts
+    Stages:
+      WARNING  (attempts 1-3): error message only
+      COOLDOWN (attempts 4-5): 5-minute temporary lock
+      DISABLED (attempts 6+):  account permanently locked (user.is_locked = True)
+    """
 
-    username = models.CharField(max_length=150, db_index=True)
+    STAGE_WARNING  = 'WARNING'
+    STAGE_COOLDOWN = 'COOLDOWN'
+    STAGE_DISABLED = 'DISABLED'
+
+    username   = models.CharField(max_length=150, db_index=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
-    attempts = models.PositiveIntegerField(default=0)
-    last_attempt = models.DateTimeField(auto_now=True)
+    attempts   = models.IntegerField(default=0)
+    stage      = models.CharField(
+        max_length=20,
+        default=STAGE_WARNING,
+        choices=[
+            (STAGE_WARNING,  'Warning'),
+            (STAGE_COOLDOWN, 'Cooldown'),
+            (STAGE_DISABLED, 'Disabled'),
+        ],
+    )
     locked_until = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text="Account locked until this time. Null means not locked.",
+        null=True, blank=True,
+        help_text="Temporary cooldown end time — stage 2 only",
+    )
+    last_attempt = models.DateTimeField(auto_now=True)
+    created_at   = models.DateTimeField(
+        default=timezone.now,
+        help_text="When this attempt record was first created",
     )
 
+    LOCKOUT_MINUTES = 5
+
     class Meta:
-        app_label = "authentication"
-        unique_together = [["username", "ip_address"]]
-        verbose_name = "Login Attempt"
-        verbose_name_plural = "Login Attempts"
+        unique_together = [['username', 'ip_address']]
+        verbose_name = 'Login Attempt'
+        verbose_name_plural = 'Login Attempts'
 
     def __str__(self):
-        return f"{self.username} — {self.attempts} attempts"
+        return f"{self.username} from {self.ip_address} — {self.attempts} attempts ({self.stage})"
 
     @property
     def is_locked(self):
-        """Whether this username+IP is currently locked out."""
-        if self.locked_until:
-            from django.utils import timezone
-
-            return timezone.now() < self.locked_until
+        """True if currently in cooldown that has not expired."""
+        from django.utils import timezone
+        if self.locked_until and timezone.now() < self.locked_until:
+            return True
         return False
 
     @property
     def minutes_remaining(self):
-        """Minutes left in the lockout. Returns 0 if not locked."""
-        if self.is_locked:
-            from django.utils import timezone
-
+        """Minutes left in current cooldown. 0 if not in cooldown."""
+        from django.utils import timezone
+        if self.locked_until and timezone.now() < self.locked_until:
             delta = self.locked_until - timezone.now()
             return max(1, int(delta.total_seconds() / 60))
         return 0
+
+
+class UnlockToken(models.Model):
+    """One-time email token for self-service account unlock after brute force lockout.
+
+    User receives this in their email — clicking the link proves
+    they own the registered email address.
+    """
+
+    user       = models.ForeignKey(
+        'CustomUser',
+        on_delete=models.CASCADE,
+        related_name='unlock_tokens',
+    )
+    token      = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used    = models.BooleanField(default=False)
+    used_at    = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Unlock Token'
+        verbose_name_plural = 'Unlock Tokens'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Unlock token for {self.user.username} — used: {self.is_used}"
+
+    @property
+    def is_valid(self):
+        """Token is valid only if not used and not expired."""
+        from django.utils import timezone
+        return not self.is_used and timezone.now() < self.expires_at
+
+    @classmethod
+    def create_for_user(cls, user, validity_hours=1):
+        """Create a fresh one-time unlock token. Invalidates old unused tokens."""
+        from django.utils import timezone
+        from datetime import timedelta
+        cls.objects.filter(user=user, is_used=False).update(
+            is_used=True,
+            used_at=timezone.now(),
+        )
+        return cls.objects.create(
+            user=user,
+            expires_at=timezone.now() + timedelta(hours=validity_hours),
+        )
 
 
 

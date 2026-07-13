@@ -184,6 +184,41 @@ class KeycloakAdminService:
             raise Exception(f"Failed to update user in Keycloak. Status: {response.status_code}")
         logger.info(f"Keycloak: Updated user {keycloak_id}")
 
+    def get_user(self, keycloak_id):
+        """Fetch a single user from Keycloak. Returns dict with 'enabled', 'email', etc. or None."""
+        headers = self._get_headers()
+        url = f"{self.server_url}/admin/realms/{self.realm}/users/{keycloak_id}"
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            return response.json()
+        logger.warning(f"Keycloak: Failed to fetch user {keycloak_id}. Status: {response.status_code}")
+        return None
+
+    def list_users_page(self, first=0, max=100):
+        """Fetch one page of users from Keycloak. Returns list of user dicts."""
+        headers = self._get_headers()
+        url = f"{self.server_url}/admin/realms/{self.realm}/users?first={first}&max={max}"
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            return response.json()
+        logger.warning(f"Keycloak: Failed to list users. Status: {response.status_code}")
+        return []
+
+    def get_all_users(self):
+        """Fetch ALL users from Keycloak (handles pagination automatically)."""
+        all_users = []
+        first = 0
+        page_size = 100
+        while True:
+            batch = self.list_users_page(first=first, max=page_size)
+            if not batch:
+                break
+            all_users.extend(batch)
+            if len(batch) < page_size:
+                break
+            first += page_size
+        return all_users
+
     def reset_password(self, keycloak_id, new_password):
         """Reset a user's password in Keycloak."""
         headers  = self._get_headers()

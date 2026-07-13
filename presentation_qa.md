@@ -9,41 +9,53 @@
 
 | # | Part | What it explains |
 |---|------|-----------------|
-| 1 | [Django Request Flow](#part-1) | Step-by-step: what happens from typing a URL to getting a response |
+| | **HOW THE SYSTEM WORKS** | |
+| 1 | [Django Request Flow](#part-1) | Step-by-step from typing a URL to getting a response |
 | 2 | [Multi-tenancy](#part-2) | What multi-tenancy means (apartment analogy) |
-| 3 | [django-tenants](#part-3) | How django-tenants creates separate schemas per ministry, with code evidence |
-| 4 | [Keycloak SSO Flow](#part-4) | The 14-step login flow + Keycloak purpose + sessions + session expiry (3 timers) |
-| 5 | [Keycloak vs SimpleJWT](#part-5) | When each is used, why mobile doesn't use Keycloak, why web doesn't use JWT |
+| 3 | [How django-tenants Works](#part-3) | How separate schemas per ministry are created |
+| 17 | [Complete Request-to-Response Flow](#part-17) | Full detailed flow for web + mobile |
+| | **AUTHENTICATION & LOGIN** | |
+| 4 | [Keycloak SSO Flow](#part-4) | 14-step login flow + Keycloak purpose + sessions + 3 timers + forgot password |
+| 5 | [Keycloak vs SimpleJWT](#part-5) | When each is used, why mobile doesn't use Keycloak |
+| 7 | [All Code Components](#part-7) | Decorators, serializers, middleware, permissions, helpers |
+| 12 | [JWT Tokens](#part-12) | Access vs refresh token, 3 parts of JWT, expiration |
+| | **SECURITY** | |
+| 8 | [Security Features](#part-8) | All 14 security features with code evidence |
+| (in Part 4) | [Brute-Force Lockout](#part-4) | 3-stage progressive lockout, email unlock, admin management |
+| | **TECHNOLOGIES** | |
 | 6 | [0.0.0.0:8000 Explained](#part-6) | Why we use it, what happens if we don't |
-| 7 | [All Code Components](#part-7) | Decorators, serializers, middleware, permissions, exception handler, pagination, helper functions explained |
-| 8 | [Security Features](#part-8) | All 15 security features + IP capture in audit logs, IntegerField vs ForeignKey explained |
-| 9 | [Database Design](#part-9) | Public schema vs tenant schemas, why not one big table |
-| 10 | [Other Technologies](#part-10) | DRF, CORS, mozilla-django-oidc, drf-yasg, SimpleJWT, decouple, etc. |
-| 11 | [Deployment to Cloud](#part-11) | What you need for production, do you use 0.0.0.0? |
-| 12 | [JWT Tokens](#part-12) | Access vs refresh token, 3 parts of JWT, expiration, how to change |
-| 13 | [Integration With Other Groups](#part-13) | How they call our API, what we share, example code, all endpoints listed |
+| 10 | [Other Technologies](#part-10) | DRF, CORS, OIDC, drf-yasg, SimpleJWT, decouple, etc. |
+| 24 | [Complete File-by-File Explanation](#part-24) | Every folder and every `.py` file explained |
+| | **DATABASE** | |
+| 9 | [Database Design](#part-9) | Public schema vs tenant schemas, why not one table |
+| 21 | [Database Deep Dive](#part-21) | All tables, columns, shared vs private explained |
+| | **INTEGRATION** | |
+| 13 | [Integration With Other Groups](#part-13) | How they call our API, ngrok guide, WhatsApp message template, FAQ |
 | 14 | [Why Each Ministry Needs a Domain](#part-14) | Why not just use /ministry/1/ in the URL |
-| 15 | [Presentation Tips](#part-15) | Common panel questions, demo sequence, how to answer |
+| 26 | [The Full 10-Group Project](#part-26) | Structure, Group 1's role, dependency matrix |
+| | **DEPLOYMENT & SETUP** | |
+| 11 | [Deployment to Cloud](#part-11) | What you need for production |
+| 22 | [Making the System Live](#part-22) | Production setup, domains, NGINX proxy, X-Forwarded-For |
+| 23 | [Dev Setup: Web + Mobile](#part-23) | How two developers work together |
+| 25 | [Important Commands & Setup](#part-25) | PostgreSQL, start Keycloak, start Django, troubleshoot |
+| | **PRESENTATION PREP** | |
+| 15 | [Presentation Tips](#part-15) | Common panel questions, demo sequence |
 | 16 | [Quick Reference](#part-16) | Every key file and what it does |
-| 17 | [Complete Request-to-Response Flow](#part-17) | Web browser flow + mobile API flow in full detail |
 | 18 | [Glossary](#part-18) | Simple definitions of every technical term |
 | 19 | [Remember This for the Panel](#part-19) | Key sentences to memorize |
-| 20 | [CSS Quick Reference](#part-20) | How to change colors, text size, backgrounds — inline CSS & Bootstrap Icons |
-| 21 | [Database Deep Dive](#part-21) | All tables, columns, why shared vs private schemas, why PostgreSQL auto-starts |
-| 22 | [Making the System Live](#part-22) | Production setup, domains, code changes, NGINX proxy, load balancers, X-Forwarded-For IP headers explained |
-| 23 | [Dev Setup: Web + Mobile](#part-23) | How two developers work together + which fixes affect mobile vs web only |
-| 24 | [Complete File-by-File Explanation](#part-24) | Every folder and every `.py` file explained, with key classes and code evidence |
-| 25 | [Important Commands & Setup Reference](#part-25) | Full step-by-step: PostgreSQL, find IP, start Keycloak, start Django, connect phone, register domain, Flutter rebuild, demo data, troubleshooting, test accounts |
-| 26 | [The Full 10-Group Project](#part-26) | Complete project structure, Group 1's role as security/auth foundation, dependency matrix (all 9 groups depend on us), dissertation titles, where our API fits |
-| 27 | [Tonight & Tomorrow Checklist](#part-27) | What to do tonight, tomorrow morning, 30 mins before panel, what to bring, what NOT to do |
-| 28 | [Defense Strategies](#part-28) | What If scenarios — crash, freeze, missing features, technology choices, no tests, performance, forgetting your lines |
-| 29 | [Confidence Tips](#part-29) | Posture, eye contact, voice, recovery from stumbling, the 3-bullet rule, owning weaknesses, the panel's real questions, final pep talk |
+| 20 | [CSS Quick Reference](#part-20) | How to change colors, text size, backgrounds |
+| 27 | [Tonight & Tomorrow Checklist](#part-27) | What to do before the panel |
+| 28 | [Defense Strategies](#part-28) | What If scenarios — crash, freeze, missing features |
+| 29 | [Confidence Tips](#part-29) | Posture, eye contact, voice, recovery |
 
 ---
 
 <a name="part-1"></a>
 ## PART 1: DJANGO REQUEST FLOW — What happens from URL to response?
 
+> **This part covers:** The basic 11-step flow.  
+> For a more detailed walkthrough with code examples, see **[Part 18: Complete Request-to-Response Flow](#part-18)**.
+> 
 > **In this part:**
 > - [11-step request flow](#part-1a)
 > - [Our project's specific flow (Keycloak)](#part-1b)
@@ -189,8 +201,25 @@ with schema_context(user.ministry_schema):
 <a name="part-4"></a>
 ## PART 4: KEYCLOAK SSO — The full login flow (simple version)
 
+> **This part is long. Jump to any topic:**
+> - [The 14-step login flow](#part-4-flow)
+> - [How Django verifies the token (3 checks)](#part-4-verify)
+> - [What is Keycloak for? (Why do we have it?)](#part-4-purpose)
+> - [Django vs Keycloak: who stores what](#part-4-division)
+> - [Does Django store passwords?](#part-4-passwords)
+> - [What if user is in Keycloak but not Django? (PendingAccess)](#part-4-pending)
+> - [Two ways a user can be created](#part-4-creation)
+> - [Session expiry: 3 timers explained](#part-4-sessions)
+> - [Forgot password with Keycloak](#part-4-forgot)
+> - [Wrong password lockout — Triple protection](#part-4-lockout)
+> - [3-stage progressive lockout details](#part-4-stages)
+> - [SSO blocking for locked accounts](#part-4-sso-block)
+> - [Admin user management: is_locked vs is_active](#part-4-admin)
+> - [Two-way sync between Django and Keycloak](#part-4-sync)
+
 Keycloak is a separate program that handles logging in. Django does NOT handle passwords — Keycloak does.
 
+<a name="part-4-flow"></a>
 ### The flow with 3 characters:
 
 ```
@@ -220,6 +249,7 @@ Step 13: If user exists → login successful → redirect to /dashboard/
 Step 14: If user doesn't exist → create PendingAccess → show error message
 ```
 
+<a name="part-4-verify"></a>
 ### How Django knows the user is real (not a hacker):
 
 Three checks, like a passport check at the airport:
@@ -242,6 +272,7 @@ Check 3 — THE DATABASE LOOKUP (application):
   If no matching user found → REJECTED (shows pending access message)
 ```
 
+<a name="part-4-purpose"></a>
 ### What is the real purpose of Keycloak? (Why do we have it at all?)
 
 This is the most important question. Here is the answer:
@@ -288,6 +319,7 @@ ALTERNATIVE (without Keycloak):
 
 **Key point:** Keycloak is NOT just for us. It is the CENTRAL identity system for ALL government online services. Our Django app is just ONE of many systems that use it.
 
+<a name="part-4-division"></a>
 ### How Django and Keycloak work together — the relationship
 
 ```
@@ -320,6 +352,7 @@ If we ONLY used Keycloak: Keycloak doesn't know what ministry the user belongs t
 
 If we ONLY used Django: Each government system would have its own login. User needs 20 accounts. No centralized identity.
 
+<a name="part-4-passwords"></a>
 ### Does Django also store user credentials (passwords)?
 
 The answer depends on how the user was created:
@@ -363,6 +396,7 @@ These are **SEPARATE** passwords stored in **SEPARATE** databases. Changing one 
 **What happens if a Keycloak-only user tries to log in via the mobile app?**
 They fail. Django has no valid stored password for them (only an unusable placeholder). The mobile app shows "Invalid credentials." This is correct behavior — the admin must set a separate Django password if the user needs mobile access.
 
+<a name="part-4-pending"></a>
 ### What if a user exists in Keycloak but NOT in our Django database?
 
 **Step 1:** User goes to our login page, clicks SSO, types their Keycloak username/password correctly. Keycloak says "Yes, this person is real."
@@ -427,6 +461,7 @@ YES. A Super Admin can create a user directly in Django using the user managemen
 
 If the user also needs web access, the Super Admin must ALSO create them in Keycloak. Our code in `authentication/keycloak_admin.py` helps automate this — when you create a user in Django, it can optionally create a matching account in Keycloak too.
 
+<a name="part-4-creation"></a>
 ### Summary: Two creation paths
 
 ```
@@ -469,6 +504,7 @@ When you log out:
 2. Django tells Keycloak to destroy its session too (you're logged out of Keycloak)
 3. Both sessions are gone
 
+<a name="part-4-sessions"></a>
 ### Session expiry — Why you get asked to sign in again
 
 You noticed that if you leave the system idle for a while, or switch to another tab for a long time, you come back and it asks you to sign in again. This is called **session expiry** and it is one of your security features — not a bug.
@@ -560,6 +596,7 @@ Timer 4: Refresh token     → 1 day → must log in again
 - **Mobile app shows login screen after a day** → Refresh token expired
 - **Quickly after switching tabs** → Not a timeout — likely your browser lost the cookie, or you accidentally logged out
 
+<a name="part-4-forgot"></a>
 ### Forgot password — How it works with Keycloak
 
 **Question:** Does the "forgot password" feature still work now that Keycloak handles passwords?
@@ -586,13 +623,16 @@ Django is not involved in this process. This is **more secure** because password
 
 **Does our Django "forgot password" URL still work?** It might appear to work (send an email), but it would reset a password that isn't actually used anymore. If your login page has a "forgot password" link that goes to Django's own reset page, you should remove that link or redirect it to Keycloak's login page where the real forgot-password button lives.
 
-### Wrong password lockout — Double protection
+<a name="part-4-lockout"></a>
+### Wrong password lockout — Triple protection (progressive + email unlock)
 
 **Question:** If someone types the wrong password 5 times, does the lockout still work with Keycloak?
 
-**Answer:** You actually have TWO separate lockout systems protecting you:
+**Answer:** You actually have THREE separate protection layers, each covering a different attack surface:
 
-**Lockout System 1 — Keycloak's own lockout (for web browser users):**
+---
+
+**Layer 1 — Keycloak's own lockout (for web browser users):**
 
 Keycloak itself watches for wrong passwords. After 5 wrong attempts, Keycloak locks that account for 15 minutes. This happens entirely inside Keycloak — Django doesn't even know about it.
 
@@ -606,61 +646,659 @@ Web user sees on Keycloak's page: "Account temporarily disabled"
 Django was never contacted — Keycloak handled everything
 ```
 
-**Lockout System 2 — Django's own lockout (for API/mobile users):**
+---
 
-Your `authentication/models.py` has a `LoginAttempt` model that records every login attempt:
+**Layer 2 — Django's 3-stage progressive lockout with email self-service unlock (for API/mobile users):**
+
+This is our NEW system. Instead of a simple counter that resets after 15 minutes, we have a **3-stage progressive lockout** that gets more severe with each failure:
+
+#### The Three Stages
+
+| Stage | Attempts | What happens |
+|---|---|---|
+| **WARNING** | 1–3 failed attempts | The user is told "Invalid credentials" with remaining attempts shown. No lock. Just counting. |
+| **COOLDOWN** | 4–5 failed attempts | The user is locked out for 5 minutes. On the **5th failure**, the account is also disabled and an unlock email is sent. |
+| **DISABLED** | 6+ failed attempts | The account is permanently locked (`is_locked = True`). A new unlock email is sent. The only way back in is via the email link or an admin. |
+
+```
+Full flow:
+
+Attempt 1:   "Invalid credentials (3 attempts remaining)"
+Attempt 2:   "Invalid credentials (2 attempts remaining)"
+Attempt 3:   "Invalid credentials (1 attempt remaining)"
+Attempt 4:   "Account locked for 5 minutes. Try again later."
+Attempt 5:   "Account disabled. Check your email for unlock instructions."
+                ↓
+         Email sent to console:
+         "Click here to unlock: http://127.0.0.1:8000/unlock-account/<uuid>/"
+                ↓
+         If user tries again during cooldown: "Account locked. <X> minutes remaining."
+         If user waits for cooldown and tries again: counts as attempt #6 → disabled again
+         If user clicks unlock link → account unlocked → all LoginAttempt records deleted → counter reset
+```
+
+**Key design decisions:**
+
+| Decision | Why |
+|---|---|
+| **Counter never resets on cooldown expiry** | If the user could just wait 5 minutes and try again indefinitely, the lockout is useless. Once you reach DISABLED stage, you stay there until you use the unlock link. |
+| **`is_locked` is separate from `is_active`** | `is_active=False` means an admin manually deactivated the user. `is_locked=True` means the brute-force protection kicked in. An admin can unlock without affecting `is_active`, and vice versa. |
+| **Unlock token is one-time + 1-hour expiry** | Even if someone intercepts the email, the link only works once and expires quickly. |
+| **Old tokens are invalidated when a new one is created** | If the user requests (or an attacker triggers) multiple lockouts, only the LATEST unlock link works. All previous tokens are marked as used. |
+| **Full LoginAttempt history is DELETED on unlock** | Not marked as resolved. Hard delete. The user starts with a completely clean slate. |
+
+**The models:**
 
 ```python
 # authentication/models.py
+
+# One new field on CustomUser:
+is_locked = BooleanField(default=False)
+# This is distinct from is_active. A user can be:
+#   is_active=True,  is_locked=False → normal (can log in)
+#   is_active=True,  is_locked=True  → locked by brute force (cannot log in)
+#   is_active=False, is_locked=False → deactivated by admin (cannot log in)
+#   is_active=False, is_locked=True  → deactivated + locked (cannot log in)
+
+# LoginAttempt now has a stage field:
 class LoginAttempt(models.Model):
-    username = models.CharField(max_length=150)
-    ip_address = models.GenericIPAddressField()
-    attempted_at = models.DateTimeField(auto_now_add=True)
-    was_successful = models.BooleanField(default=False)
+    class Stage(models.TextChoices):
+        WARNING  = 'WARNING',   'Warning'    # 1–3 attempts
+        COOLDOWN = 'COOLDOWN',  'Cooldown'   # 4–5 attempts (5-min lock)
+        DISABLED = 'DISABLED',  'Disabled'   # 6+ attempts (permanent lock)
+
+    username    = CharField(max_length=150)
+    ip_address  = GenericIPAddressField()
+    attempts    = IntegerField(default=1)
+    stage       = CharField(max_length=20, choices=Stage.choices, default=Stage.WARNING)
+    locked_until = DateTimeField(null=True, blank=True)  # When cooldown expires
+    created_at  = DateTimeField(auto_now_add=True)
+    last_attempt = DateTimeField(auto_now=True)
+
+# New model for email unlock:
+class UnlockToken(models.Model):
+    user       = ForeignKey(CustomUser, on_delete=CASCADE)
+    token      = UUIDField(unique=True, default=uuid4)
+    created_at = DateTimeField(auto_now_add=True)
+    used       = BooleanField(default=False)
+
+    @classmethod
+    def create_for_user(cls, user):
+        # Mark any existing unused tokens as used first
+        cls.objects.filter(user=user, used=False).update(used=True)
+        return cls.objects.create(user=user)
 ```
 
-Your API login view checks this before allowing login:
+**The login view method — how it decides which stage:**
 
 ```python
 # authentication/api_views.py (simplified)
 class LoginAPIView(APIView):
     def post(self, request):
         username = request.data.get('username')
-        ip = request.META.get('REMOTE_ADDR')
+        ip = _get_client_ip(request)
 
-        # Count recent failed attempts from this IP
-        recent_failures = LoginAttempt.objects.filter(
+        # Get or create tracking record for this user+IP
+        attempt, _ = LoginAttempt.objects.get_or_create(
             username=username,
-            was_successful=False,
-            attempted_at__gte=timezone.now() - timedelta(minutes=15)
-        ).count()
+            ip_address=ip,
+            defaults={'attempts': 1, 'stage': Stage.WARNING}
+        )
 
-        if recent_failures >= 5:
+        # Check cooldown: if user is in cooldown and timer hasn't expired
+        if (attempt.stage == Stage.COOLDOWN
+                and attempt.locked_until
+                and timezone.now() < attempt.locked_until):
+            remaining = int((attempt.locked_until - timezone.now()).total_seconds() / 60)
             return Response(
-                {'error': 'Too many failed attempts. Try again in 15 minutes.'},
+                {'error': f'Account locked. Try again in {remaining} minute(s).'},
                 status=429
             )
 
-        # Proceed with login
-        user = authenticate(username=username, password=password)
+        # If cooldown expired, let them try but keep counting
+        if (attempt.locked_until and timezone.now() >= attempt.locked_until):
+            attempt.locked_until = None
 
-        # Record this attempt
-        LoginAttempt.objects.create(
-            username=username,
-            ip_address=ip,
-            was_successful=(user is not None)
-        )
+        # Check if permanently disabled
+        if attempt.stage == Stage.DISABLED:
+            return Response({
+                'error': 'Account disabled due to multiple failed attempts. '
+                          'Check your email for unlock instructions.'
+            }, status=403)
+
+        # Increment attempt counter
+        attempt.attempts += 1
+        attempt.save(update_fields=['attempts', 'last_attempt'])
+
+        # Stage assignment based on attempt count
+        if attempt.attempts <= settings.LOGIN_MAX_WARNINGS:      # 1–3
+            attempt.stage = Stage.WARNING
+            remaining = settings.LOGIN_MAX_WARNINGS - attempt.attempts + 1
+            return Response({'error': f'Invalid credentials ({remaining} attempts remaining)'})
+
+        elif attempt.attempts <= settings.LOGIN_MAX_ATTEMPTS:    # 4–5
+            attempt.stage = Stage.COOLDOWN
+            attempt.locked_until = timezone.now() + timedelta(minutes=cooldown_mins)
+            if attempt.attempts >= settings.LOGIN_MAX_ATTEMPTS:
+                # On the 5th failure: disable + send unlock email
+                attempt.stage = Stage.DISABLED
+                user = CustomUser.objects.filter(username=username).first()
+                if user:
+                    _disable_account(user, attempt)
+                    _send_unlock_email(user, request)
+            return Response({'error': f'Account locked for {cooldown_mins} minute(s).'}, status=429)
+
+        else:                                                    # 6+
+            attempt.stage = Stage.DISABLED
+            user = CustomUser.objects.filter(username=username).first()
+            if user:
+                _disable_account(user, attempt)
+                _send_unlock_email(user, request)
+            return Response({
+                'error': 'Account disabled. Check your email for unlock instructions.'
+            }, status=403)
 ```
+
+**The unlock email:**
+
+```python
+# authentication/api_views.py — _send_unlock_email()
+def _send_unlock_email(self, user, request):
+    token = UnlockToken.create_for_user(user)
+    unlock_url = f"{settings.PLATFORM_BASE_URL}/unlock-account/{token.token}/"
+    send_mail(
+        subject='Account Unlock Instructions',
+        message=f'Your account has been locked due to multiple failed login attempts.'
+                f'\n\nClick the link below to unlock your account (valid for 1 hour):'
+                f'\n{unlock_url}',
+        from_email='noreply@govasset.go.tz',
+        recipient_list=[user.email],
+        fail_silently=False,
+    )
+```
+
+In development, emails print to the terminal (console backend). In production, real emails are sent.
+
+**The unlock page (GET /unlock-account/<uuid:token>/):**
+
+```python
+# authentication/unlock_views.py
+def account_unlock_view(request, token):
+    try:
+        unlock_token = UnlockToken.objects.get(token=token, used=False)
+    except UnlockToken.DoesNotExist:
+        return render(request, 'authentication/unlock_result.html', {
+            'success': False,
+            'message': 'This link is invalid or has already been used.'
+        })
+
+    # Check expiry (1 hour)
+    if timezone.now() > unlock_token.created_at + timedelta(hours=1):
+        return render(request, 'authentication/unlock_result.html', {
+            'success': False,
+            'message': 'This link has expired. Contact your administrator.'
+        })
+
+    # Unlock the account
+    user = unlock_token.user
+    user.is_locked = False
+    user.save(update_fields=['is_locked'])
+
+    # Delete ALL LoginAttempt records for this user (fresh start)
+    LoginAttempt.objects.filter(username=user.username).delete()
+
+    # Mark token as used
+    unlock_token.used = True
+    unlock_token.save(update_fields=['used'])
+
+    # Write to audit log
+    AuditLog.objects.create(...)
+
+    return render(request, 'authentication/unlock_result.html', {
+        'success': True,
+        'message': 'Your account has been unlocked. You can now log in.'
+    })
+```
+
+---
+
+<a name="part-4-sso-block"></a>
+**Layer 3 — SSO blocking (for Keycloak web users whose Django account is locked):**
+
+Even though Keycloak handles its own lockout, we added an EXTRA check: if a user's Django account has `is_locked=True`, they cannot log in even through Keycloak SSO. This prevents the scenario where:
+
+1. An attacker locks the account via the mobile API (5 failures)
+2. The attacker then tries Keycloak SSO via web
+3. Without this check, Keycloak would say "password is correct" and let them in
+
+Our OIDC backend checks `user.is_locked` and blocks the login:
+
+```python
+# authentication/oidc_backend.py
+def filter_users_by_claims(self, claims):
+    users = CustomUser.objects.filter(...)
+    if users.exists() and users.first().is_locked:
+        # Show a lock message on the login page
+        return CustomUser.objects.none()  # ← Returns empty = login fails
+```
+
+The login page then displays: *"Your account has been locked. Check your email for unlock instructions."*
+
+---
 
 **Summary — Who protects whom:**
 
-| Who is trying to log in | Which lockout protects them |
+| Who is trying to log in | Which protection blocks them |
 |---|---|
-| Web browser user (through Keycloak page) | Keycloak's own built-in lockout |
-| Mobile app user (through your API) | Your Django `LoginAttempt` lockout |
-| Another group's system (through your API) | Your Django `LoginAttempt` lockout |
+| Web browser user (through Keycloak page) | **Layer 1** — Keycloak's own lockout (after 5 wrong passwords on Keycloak's page) |
+| Web browser user (Keycloak password correct, but Django account locked) | **Layer 3** — OIDC backend checks `is_locked` and rejects |
+| Mobile app user (through your API) | **Layer 2** — 3-stage progressive lockout (after 5 failures, permanent disable + email unlock) |
+| Another group's system (through your API) | **Layer 2** — Same 3-stage lockout applies |
 
-You have double protection. Both paths are covered.
+You have **triple protection**. Every path is covered.
+
+---
+
+<a name="part-4-admin"></a>
+### Admin user management — How locked users appear (and the bug we fixed)
+
+**Question:** If a user gets locked by brute-force protection, why doesn't the user management page at `/users/` show them as disabled/locked?
+
+**Answer:** This was a bug we discovered and fixed. Here's the full story:
+
+#### The two separate status fields
+
+When we designed the brute-force protection, we created `is_locked` as a **separate field** from Django's built-in `is_active`. This was intentional:
+
+| Field | What it means | Who controls it |
+|---|---|---|
+| `is_active` (Django built-in) | "Is this user allowed to log in at all?" | The admin manually toggles this from the user management page |
+| `is_locked` (our new field) | "Was this user locked by brute-force protection?" | The system sets this automatically after 5+ failed attempts |
+
+These are independent. A user can be:
+```
+is_active=True,  is_locked=False → Normal user (can log in)
+is_active=True,  is_locked=True  → Locked by brute force (cannot log in, needs unlock)
+is_active=False, is_locked=False → Deactivated by admin (cannot log in)
+is_active=False, is_locked=True  → Deactivated by admin AND locked by system (cannot log in)
+```
+
+#### The bug
+
+The user management table at `/users/` originally only checked `is_active` to determine the status:
+
+```html
+{# OLD code — only checked is_active #}
+<span class="status-dot {% if u.is_active %}active{% else %}inactive{% endif %}"></span>
+{% if u.is_active %}Active{% else %}Inactive{% endif %}
+```
+
+And the toggle button only flipped `is_active`:
+
+```python
+# OLD code — never touched is_locked
+target_user.is_active = not target_user.is_active
+target_user.save()
+```
+
+So when brute-force protection locked a user (`is_locked=True` but `is_active` stayed `True`):
+- The status column showed **"Active"** (green dot) — misleading
+- The toggle button showed **"Deactivate"** (red icon) — wrong action
+- The row had full opacity — no visual dimming
+- Clicking the toggle button would deactivate (`is_active=False`) but leave `is_locked=True`, making things worse
+
+#### The fix
+
+We made three changes:
+
+**1. Status column now shows three states:**
+
+```
+User state        Display
+──────────────────────────────
+Active + unlocked → "Active" (green dot)
+Inactive          → "Inactive" (gray dot)
+Locked            → "Locked" (amber/orange dot)
+```
+
+Code:
+```html
+{% if u.is_locked %}
+  <span class="status-dot" style="background:#d97706;"></span>
+  <span style="color:#d97706;font-weight:600;">Locked</span>
+{% elif u.is_active %}
+  <span class="status-dot active"></span>
+  Active
+{% else %}
+  <span class="status-dot inactive"></span>
+  Inactive
+{% endif %}
+```
+
+**2. Toggle button now adapts to locked state:**
+
+| User state | Button shown | Icon | Color | Confirmation |
+|---|---|---|---|---|
+| Active + unlocked | Deactivate | `person-slash` | Red outline | "Deactivate username?" |
+| Inactive + unlocked | Activate | `person-check` | Gray outline | "Activate username?" |
+| Locked | **Unlock** | `unlock` | **Orange** outline | "Unlock username?" |
+
+**3. Toggle view now clears `is_locked` when re-enabling:**
+
+```python
+target_user.is_active = not target_user.is_active
+if target_user.is_active and target_user.is_locked:
+    target_user.is_locked = False  # ← NEW: clear lock when activating
+target_user.save()
+```
+
+So if an admin clicks the unlock button for a locked user, it:
+1. Sets `is_active = True`
+2. Sets `is_locked = False`
+3. Syncs the active status to Keycloak via the Keycloak admin API
+
+The user can now log in again immediately.
+
+#### Why not just use `is_active` for lockout?
+
+**Question:** Can we just use one field instead of two? Why do we need both `is_active` and `is_locked`?
+
+**Answer:** Both are needed because they control two completely different things. Here's why you cannot remove either one:
+
+**The building analogy:**
+
+Think of your system as a secured office building with two separate security layers:
+
+| Security layer | Our system equivalent | Who controls it |
+|---|---|---|
+| **The building manager's key** | `is_active` | The admin (via the `/users/` page) |
+| **The automatic security lock** | `is_locked` | The system (auto-locks after 5 wrong passwords) |
+
+- The **building manager** has a master key. They decide who works here. If an employee is fired, the manager disables their badge (`is_active=False`).
+- The **automatic security lock** is like a door that locks itself after someone types the wrong PIN 5 times. The employee can call security (click the unlock email link) to get back in.
+
+Now imagine what happens if we remove one of them:
+
+**Scenario A — If we only had `is_active` (no `is_locked`):**
+
+```
+1. Employee forgets password → types wrong password 5 times
+2. System sets is_active=False (locks them out)
+3. Unlock email is sent to the employee
+4. Employee clicks the unlock link
+5. System sets is_active=True → employee is back in
+   ✓ Good: Employee can self-service unlock
+
+But what if:
+6. Admin fires the employee → sets is_active=False
+7. The fired employee goes to the login page → types wrong password 5 times
+8. System sends unlock email
+9. Fired employee clicks the link → is_active=True!
+   ✗ BAD! A FIRED EMPLOYEE CAN UNLOCK THEMSELVES!
+```
+
+This is a security disaster. The self-service unlock should NOT override an admin's decision to deactivate someone.
+
+**Scenario B — If we only had `is_locked` (no `is_active`):**
+
+```
+1. Admin fires an employee → needs to block their access
+2. System sets is_locked=True
+3. But is_locked is a custom field — Django's built-in auth doesn't check it
+4. The employee might slip through in login pages, password resets, or API calls
+5. Also, the sync to Keycloak uses Django's built-in is_active
+6. Toggling the button on /users/ page would need extra custom code everywhere
+```
+
+This is unreliable. Django's core authentication system checks `is_active` in many places automatically. Our custom `is_locked` field only works where we explicitly check it.
+
+**The real distinction — What each lock protects:**
+
+| Lock | Who holds the key | Can the unlock email override it? |
+|---|---|---|
+| `is_active` | Only the admin | **NO** — A fired employee cannot get back in by typing wrong passwords |
+| `is_locked` | The user (via unlock email) | **YES** — The self-service unlock link only clears this field |
+
+**Summary — Why we need both:**
+
+```
+Two fields = two separate concerns.
+                                 
+  is_active  →  "Should this person work here at all?"
+                 Controlled by: Admin only
+                 Overrideable by: Nobody except admin
+                 
+  is_locked  →  "Did someone try to break into this account?"
+                 Controlled by: System (auto after 5 failures)
+                 Overrideable by: User (via unlock email) OR admin
+```
+
+If we merged them, the admin's decision to fire someone could be undone by a simple unlock email. That's why they stay separate.
+
+#### What about the Keycloak admin panel?
+
+Keycloak also has its own user status (enabled/disabled). When our system locks a user (`is_locked=True`), it does NOT automatically disable the user in Keycloak. This is why:
+
+- **Keycloak's enabled/disabled** controls whether the user can log in through Keycloak's login page
+- **Django's `is_locked`** controls whether the user can log in through our API
+
+They are separate systems. If a user is locked in Django but still enabled in Keycloak, they:
+- **Cannot** log in via our mobile API (locked by Django)
+- **Can** try to log in via web → Keycloak checks password → if correct, Django's OIDC backend then checks `is_locked` and blocks them (Layer 3)
+
+When an admin toggles the user from our `/users/` page, it ALSO syncs to Keycloak — so both systems stay in sync.
+
+#### The reverse sync problem — Keycloak → Django was missing
+
+**Question:** If an admin disables a user in the Keycloak admin panel, why doesn't the Django `/users/` page show them as disabled?
+
+**Answer (simple):** Because Django never knew about it. Only Keycloak knew. The sync was only going one direction.
+
+Think of it like two separate offices that both have a list of employees. When you update the list in Office A (Keycloak), you have to tell Office B (Django) about the change. Before our fix, nobody was carrying the message from Office A to Office B.
+
+**What was happening before the fix:**
+
+```
+An admin logs into Keycloak admin panel → finds a user → clicks "Disable"
+         ↓
+Keycloak disables the user (sets enabled: false)
+         ↓
+But nobody tells Django about this change
+         ↓
+Django still shows is_active=True for that user
+         ↓
+The /users/ page says "Active" — WRONG!
+         ↓
+The mobile app still lets the user log in — SECURITY RISK!
+```
+
+**The fix — Two-way sync (like two offices sending each other updates):**
+
+We made the sync work in BOTH directions. Here are the three ways we did it:
+
+---
+
+**Way 1 — Auto-sync when you visit the User Management page (automatic, no clicking needed)**
+
+This is the most important fix. Every time you visit `/users/` in your browser, Django automatically asks Keycloak: "Hey, what's the status of all my users?" Then it updates its own records to match.
+
+You don't need to click anything. Just refresh the page.
+
+```
+You visit http://localhost:8000/users/
+         ↓
+Django calls Keycloak: "Give me ALL your users"
+         ↓
+Keycloak returns: [
+  { "id": "abc123", "enabled": true  },
+  { "id": "def456", "enabled": false },   ← This user was disabled in Keycloak!
+  { "id": "ghi789", "enabled": true  },
+]
+         ↓
+Django checks each user: "Does our is_active match Keycloak's enabled?"
+         ↓
+For "def456": Django had is_active=True, but Keycloak says enabled=false
+         ↓
+Django fixes it: sets is_active=False for that user
+         ↓
+The page shows "Inactive" — NOW CORRECT!
+```
+
+**Why this is better than having a refresh button per user:**
+
+Imagine you have 500 users. With a refresh button per user, you'd have to click 500 buttons — that's impossible. With auto-sync on page load, you just refresh the page ONCE and all 500 users get checked and updated in the background.
+
+The code that does this (simplified):
+
+```python
+# authentication/user_views.py — user_list_view()
+
+# Step 1: Get all users from Keycloak in ONE big request
+kc = KeycloakAdminService()
+all_kc_users = kc.get_all_users()  # This is ONE API call
+
+# Step 2: Build a quick lookup table
+# keycloak_id → is_enabled?
+kc_status = {u['id']: u.get('enabled', True) for u in all_kc_users}
+
+# Step 3: Check each Django user against Keycloak
+for django_user in all_users_on_this_page:
+    if django_user.keycloak_id in kc_status:
+        kc_enabled = kc_status[django_user.keycloak_id]
+        if kc_enabled != django_user.is_active:
+            # Found a mismatch! Fix it.
+            django_user.is_active = kc_enabled
+            django_user.save()
+```
+
+This uses a new method we added to `KeycloakAdminService` that fetches ALL users from Keycloak (automatically handling pagination — if there are 300 users, it fetches them in pages of 100):
+
+```python
+# authentication/keycloak_admin.py
+def get_all_users(self):
+    """Fetch ALL users from Keycloak. Handles pagination automatically."""
+    all_users = []
+    first = 0
+    page_size = 100
+    while True:
+        batch = self.list_users_page(first=first, max=page_size)
+        if not batch:
+            break
+        all_users.extend(batch)
+        if len(batch) < page_size:
+            break  # Last page — fewer results than page size
+        first += page_size
+    return all_users
+```
+
+---
+
+**Way 2 — Auto-sync when a user logs in (automatic, user doesn't notice)**
+
+Every time a user logs in through Keycloak (the "Sign in with Government SSO" button), Django checks that specific user's status in Keycloak and updates their `is_active` to match.
+
+This handles the case where:
+- An admin disables a user in Keycloak at 2 PM
+- That user tries to log in at 3 PM
+- Django says: "Let me check Keycloak... Oh, you're disabled. Updating my records."
+- Login fails — the user sees an error message
+- If the admin later visits `/users/`, they'll see "Inactive" (already synced!)
+
+```python
+# authentication/oidc_backend.py — filter_users_by_claims()
+if user.keycloak_id:
+    kc = KeycloakAdminService()
+    kc_user = kc.get_user(user.keycloak_id)
+    if kc_user is not None:
+        kc_enabled = kc_user.get('enabled', True)
+        if kc_enabled != user.is_active:
+            user.is_active = kc_enabled
+            user.save(update_fields=['is_active'])
+```
+
+---
+
+**Way 3 — When admin toggles from Django → Keycloak (already worked, untouched)**
+
+This was already working before. When you click the disable/enable button on the `/users/` page, Django:
+1. Changes `is_active` in its own database
+2. ALSO calls Keycloak's API to change `enabled` in Keycloak
+
+```python
+# authentication/user_views.py — user_toggle_active_view()
+target_user.is_active = not target_user.is_active
+target_user.save()
+
+# Also sync to Keycloak
+kc = KeycloakAdminService()
+kc.update_user(keycloak_id=..., is_active=target_user.is_active)
+```
+
+---
+
+#### Complete picture — How the two-way sync works now
+
+```
+ Django side (/users/)                Keycloak Admin Panel
+ ─────────────────────                ────────────────────
+
+                                      Admin disables user
+                                           ↓
+  You visit /users/ ───→ "Give me         Keycloak sets
+  (auto-sync on       ───→  all your       enabled: false
+   page load)              users!"              ↓
+       ↓                    ↓
+  Django gets:           ←─── "Here are
+  user X is disabled       all users"
+       ↓
+  Django updates
+  is_active=False
+       ↓
+  Shows "Inactive" ✓
+       ↑
+  User tries login      ←─── OIDC syncs
+  (auto-sync on login)      status too
+
+ YOU toggle button
+  is_active=True ──────→  Keycloak sets
+                           enabled: true
+```
+
+| Direction | How it works | When it happens |
+|---|---|---|
+| Django → Keycloak | Django calls `PUT /admin/realms/{realm}/users/{id}` with `enabled: true/false` | When you click the toggle button on the `/users/` page |
+| Keycloak → Django (batch) | Django calls `GET /admin/realms/{realm}/users` to get ALL users, then updates any mismatches | Every time you visit the `/users/` page (automatic) |
+| Keycloak → Django (single) | Django calls `GET /admin/realms/{realm}/users/{id}` to check ONE user | When that user logs in via SSO (automatic) |
+
+**Result:** No matter where you change a user's status — in Django or in Keycloak — the other system will find out about it. You always see the correct status on the `/users/` page. Just refresh the page, no clicking needed.
+
+---
+
+### Summary — Is our system now working correctly for both locked and disabled?
+
+**Yes.** Here is the complete picture of what happens in every scenario:
+
+| What happens | `is_active` | `is_locked` | User can log in? | Status shown on `/users/` |
+|---|---|---|---|---|
+| Normal user | `True` | `False` | Yes | **Active** (green) |
+| User types wrong password 5 times (system locks) | `True` | `True` | No | **Locked** (amber) |
+| User clicks unlock email | `True` | `False` | Yes | **Active** (green) |
+| Admin deactivates user from `/users/` page | `False` | `False` | No | **Inactive** (gray) |
+| Admin deactivates user from Keycloak admin | `False` (auto-synced) | `False` | No | **Inactive** (gray) |
+| Admin unlocks user (clicks toggle button) | `True` | `False` | Yes | **Active** (green) |
+
+**To confirm your system is working, test these scenarios:**
+
+1. **Brute-force lock:** Try wrong password 5 times via mobile API → user shows as "Locked" on `/users/` page
+2. **Self-service unlock:** Click unlock email link → user shows as "Active" again
+3. **Admin deactivation:** Click toggle button on `/users/` page → Keycloak also shows user as disabled
+4. **Keycloak deactivation:** Disable user in Keycloak admin → refresh `/users/` page → Django now shows "Inactive"
+5. **Re-enable:** Click toggle button again → both systems show active
+
+All five paths work correctly because:
+- `is_locked` and `is_active` are independent fields with separate purposes
+- The sync is now **two-way** — changes in either system propagate to the other
+- The `/users/` page checks **both** fields to show the correct status
 
 ---
 
@@ -1162,9 +1800,19 @@ Each user has a role (SUPER_ADMIN, MINISTRY_ADMIN, AGENCY_MANAGER, FACILITY_CLER
 Same as roles but for API endpoints. Different levels: IsSuperAdmin, IsMinistryAdmin, CanManageAssets, CanDeleteAssets, CanViewAuditLogs.
 - **Evidence:** `authentication/api_permissions.py`
 
-### 4. Brute force protection
-If someone tries to login 5 times with wrong password, they are locked out for 15 minutes.
-- **Evidence:** `authentication/api_views.py` — `_is_locked_out()` method
+### 4. Brute force protection — 3-stage progressive lockout with email unlock
+A 3-stage system that gets progressively more severe with each failed login attempt:
+- **Stage 1 — WARNING** (attempts 1–3): Counter only. User sees remaining attempts.
+- **Stage 2 — COOLDOWN** (attempts 4–5): 5-minute lockout. On the 5th failure, account is disabled + unlock email is sent.
+- **Stage 3 — DISABLED** (attempts 6+): Permanent lock. `is_locked=True`. Only an unlock link or admin can restore.
+- **Self-service unlock:** Email link valid 1 hour, one-time use. Deletes all `LoginAttempt` records on unlock.
+- **`is_locked` is separate from `is_active`** so admin deactivation and brute-force lockout don't interfere.
+- **Also blocks Keycloak SSO:** `filter_users_by_claims()` in `oidc_backend.py` checks `is_locked` and rejects locked users.
+- **Evidence:** `authentication/api_views.py` — `LoginAPIView.post()` with `_handle_failed_attempt()`, `_disable_account()`, `_send_unlock_email()`, `_check_cooldown()`
+- **Evidence:** `authentication/models.py` — `LoginAttempt.stage`, `CustomUser.is_locked`, `UnlockToken`
+- **Evidence:** `authentication/unlock_views.py` — `account_unlock_view()`
+- **Admin display:** User management table at `/users/` shows "Locked" (amber badge) for locked users. Toggle button changes to "Unlock" (orange icon). View `user_views.py:user_toggle_active_view()` clears `is_locked` when re-enabling.
+- **Auto-sync from Keycloak:** `user_list_view()` fetches ALL Keycloak users in one batch call on page load, syncs `is_active` for any mismatches. Also syncs during OIDC login. See `keycloak_admin.py:get_all_users()` + `oidc_backend.py:filter_users_by_claims()`.
 
 ### 5. Tamper-proof audit log
 Once an audit record is created, it cannot be edited or deleted. This is enforced by overridden `save()` and `delete()` methods.
@@ -1321,16 +1969,11 @@ except CustomUser.DoesNotExist:
     return None  # User sees "waiting for approval" message
 ```
 
-### 12. LoginAttempt brute-force tracking
-Every login attempt — success or failure — is permanently recorded. Django counts failed attempts from the same username in the last 15 minutes and blocks after 5 failures.
-- **Evidence:** `authentication/models.py` — `LoginAttempt` model
-- **Evidence:** `authentication/api_views.py` — `_is_locked_out()` helper method
-
-### 14. Password validation
+### 13. Password validation
 Users must have passwords at least 8 characters, cannot be common passwords, cannot be similar to username.
 - **Evidence:** `AUTH_PASSWORD_VALIDATORS` in settings.py
 
-### 15. Warning for default secret key
+### 14. Warning for default secret key
 If production is running with a weak secret key, Django prints a warning.
 - **Evidence:** Security checks in settings.py
 
@@ -1342,16 +1985,19 @@ The panel may notice these things and think they are security problems. Here is 
 |---|---|
 | Django's password fields are empty/null for Keycloak users | This is correct — passwords live in Keycloak, not Django. Django's password is set to an unusable value |
 | PendingAccess records exist with no role assigned | These are users Keycloak knows about but Django hasn't approved yet. Normal and expected |
-| LoginAttempt records keep growing | This is correct — they are a permanent security record and should never be deleted |
+| LoginAttempt records keep growing | This is normal — they track every failed attempt. When a user successfully unlocks via email, ALL their LoginAttempt records are DELETED (clean slate). Records for users who never unlock remain as a permanent security record |
 | Web "forgot password" might still point to Django's reset page | This is a real issue to fix — redirect it to Keycloak's forgot-password page instead |
 | `/api/auth/login/` can be called without a token | This is correct — you obviously cannot require a token BEFORE logging in |
 | Some endpoints return 403 (Forbidden) instead of 404 | This is intentional — returning 404 would reveal whether the URL exists; 403 is more secure |
-| Multiple failed login attempts from the same IP | Both Keycloak and Django track and block these after 5 failures |
+| Multiple failed login attempts from the same IP | Keycloak blocks after 5 failures (web). Django blocks with a 3-stage progressive system: WARNING (1–3), COOLDOWN (4–5, 5-min lock), DISABLED (6+, permanent lock with email unlock). Triple protection covers all paths |
 
 ---
 
 <a name="part-9"></a>
 ## PART 9: DATABASE DESIGN — How our tables are organized
+
+> **This part covers:** A quick overview of which tables live where.  
+> For the full deep dive with every column explained, see **[Part 21: Database Deep Dive](#part-21)**.
 
 ### Public schema (shared across ALL ministries):
 ```
@@ -2217,6 +2863,168 @@ urlpatterns = [
 The line `path('api/', include(...))` puts `api/` in front of every URL in `api_urls.py`. So `auth/login/` becomes `/api/auth/login/`. That is why all your APIs start with `/api/`.
 
 **How other groups see this:** They never look at these files. They just go to `/api/docs/` and see everything listed automatically.
+
+---
+
+### NEW SECTION: Step-by-Step — How to Share Your API with Other Groups RIGHT NOW
+
+This is the practical guide for contacting groups 2-10 and getting them connected to your API.
+
+#### Step 1: Start your server (make it accessible from other devices)
+
+```powershell
+# IMPORTANT: 0.0.0.0 makes Django listen on ALL network interfaces
+# Without this, other computers cannot reach you
+python manage.py runserver 0.0.0.0:8000
+```
+
+#### Step 2: Start ngrok (creates a public URL for your local server)
+
+ngrok is a free tool that creates a temporary public internet address that forwards to your laptop. Your friend abroad can access it from anywhere.
+
+1. Download ngrok from https://ngrok.com/download
+2. Sign up for a free account at https://dashboard.ngrok.com
+3. Get your auth token from the dashboard
+4. Open a SECOND terminal and run:
+
+```powershell
+ngrok config add-authtoken YOUR_AUTH_TOKEN
+ngrok http 8000
+```
+
+You will see output like:
+```
+Forwarding  https://a1b2c3d4.ngrok-free.app → http://localhost:8000
+```
+
+**How ngrok works:** ngrok creates a secure tunnel from a public server on the internet to your local Django running on port 8000. When your friend visits `https://a1b2c3d4.ngrok-free.app/api/docs/`, the request travels:
+```
+Friend's browser → internet → ngrok's server → tunnel → your Django
+```
+
+**Limitations of free ngrok:**
+- URL changes every time you restart ngrok
+- 40 connections/minute limit (enough for testing)
+- Random subdomain name
+
+**Alternative — Hotspot (if groups are nearby):**
+```powershell
+# Connect everyone to your phone's hotspot
+# Start Django with 0.0.0.0
+python manage.py runserver 0.0.0.0:8000
+
+# Find your IP address
+ipconfig
+# Look for: IPv4 Address . . . . . : 192.168.x.x
+
+# Share: http://192.168.x.x:8000/api/docs/
+```
+
+#### Step 3: Share this exact message on WhatsApp / Email
+
+Copy and send this to your groups 2-10 group:
+
+```
+GOVASSET PLATFORM — API Integration Guide
+
+Dear Groups 2-10,
+
+Our authentication API is now ready for integration testing.
+
+API Documentation (open this in your browser):
+https://a1b2c3d4.ngrok-free.app/api/docs/
+(Or use http://192.168.x.x:8000/api/docs/ if on same WiFi)
+
+Test Accounts (all passwords: Admin@123):
+  superadmin  — Super Admin (sees all ministries)
+  moh_admin   — Ministry Admin (Ministry of Health)
+  mnh_manager — Agency Manager (Ministry of Health)
+  rad_clerk   — Facility Clerk (Ministry of Health)
+  moh_auditor — Auditor (Ministry of Health)
+  mof_admin   — Ministry Admin (Ministry of Finance)
+
+How to Integrate (3 steps):
+1. Call POST /api/auth/login/ with username + password
+2. Save the 'access' token from the response
+3. Call GET /api/auth/verify-token/ with header:
+   Authorization: Bearer <access_token>
+
+Response you get from verify-token:
+{
+  "valid": true,
+  "user": {
+    "username": "moh_admin",
+    "role": "MINISTRY_ADMIN",
+    "ministry_schema": "moh_schema",
+    "ministry": "Ministry of Health"
+  }
+}
+
+Use "role" to control permissions in your system.
+Use "ministry_schema" to filter data to their ministry.
+Token expires in 30 minutes → call /api/auth/refresh/ to extend.
+
+If you need additional fields in the response, let me know.
+```
+
+#### Step 4: Handle their questions
+
+**Q: "How do I call your API from my language?"**
+Every language can make HTTP requests. Here is the Python example (they translate to PHP/Java/C#/JavaScript):
+
+```python
+import requests
+
+# Step 1: Login
+resp = requests.post('https://a1b2c3d4.ngrok-free.app/api/auth/login/', json={
+    'username': 'moh_admin',
+    'password': 'Admin@123'
+})
+token = resp.json()['access']
+
+# Step 2: Verify token
+resp = requests.get('https://a1b2c3d4.ngrok-free.app/api/auth/verify-token/', headers={
+    'Authorization': f'Bearer {token}'
+})
+user = resp.json()['user']
+print(user['role'], user['ministry_schema'])
+```
+
+**Q: "Do I need to install Keycloak?"**
+No. You only call our API endpoints. Keycloak is only for our web login flow.
+
+**Q: "What database should I use?"**
+Any database — MySQL, PostgreSQL, MongoDB, SQL Server. Your database is separate from ours. We only communicate via HTTP.
+
+**Q: "How do I handle users from different ministries?"**
+Every user response includes `ministry_schema`. Add this column to your tables and filter by it:
+
+```sql
+SELECT * FROM your_table WHERE ministry_schema = 'moh_schema'
+```
+
+**Q: "What if the token expires?"**
+Access tokens expire after 30 minutes. Call `POST /api/auth/refresh/` with your refresh token to get a new pair.
+
+**Q: "What if I need more user information (phone, department, etc.)?"**
+Ask us and we add it to the verify-token response. Takes 2 minutes if the field exists in our database.
+
+**Q: "Will my system appear in your sidebar?"**
+No. Each group has their own separate application with their own sidebar and pages. You can add a link to our system:
+```html
+<a href="http://localhost:8000/dashboard/">GovAsset Platform</a>
+```
+
+**Q: "Does your audit trail track my users' actions?"**
+No. Our audit trail tracks actions within our platform (login, user management, asset changes). You build your own audit trail for your own system.
+
+**Q: "Do I need to create users in my own database?"**
+Yes and no. You use OUR users (via verify-token) for authentication. But if you need extra fields (like "employee department" or "phone extension"), store those in your own database linked by `username`.
+
+**Q: "What if your system is down?"**
+Contact us. During development, our server runs on our laptop — it goes offline when we close it. In production, it runs 24/7 on a cloud server.
+
+---
 
 <a name="part-14"></a>
 ## PART 14: Why does each ministry need its own domain?
@@ -4506,7 +5314,7 @@ After `flutter run` finishes and the app opens on your phone, you can unplug the
 ---
 
 <a name="part-25f"></a>
-### Step 5 — Load Clean Demo Data (Optional but Recommended Before Presentations)
+### Step 5 — Load Clean Demo Data (Run Before Every Presentation)
 
 ```bash
 cd D:\government_asset_platform
@@ -4514,7 +5322,74 @@ venv\Scripts\activate
 python manage.py setup_demo_data
 ```
 
-This clears leftover test clutter and loads clean, professional-looking demo data for both ministries. Run this before any presentation or demonstration.
+This command is a **complete environment reset** — run it before every presentation to guarantee a known, predictable state.
+
+**What it does:**
+1. **Cleans** all assets, audit logs, login attempts, and ALL users (orphan + old test accounts)
+2. **Creates** 5 asset categories (ICT, VEH, FURN, MEDICAL, LAND) in every schema
+3. **Creates** org units (MOH → MNH → RAD for moh_schema, MOF for mof_schema)
+4. **Creates** 6 demo users in Django — and optionally in Keycloak
+5. **Creates** 13 assets + audit logs across 2 ministries
+
+**What it creates:**
+
+| What | Details |
+|---|---|
+| **5 categories** | ICT, VEH, FURN, MEDICAL, LAND — auto-created in every schema |
+| **Org units** | MOH → Muhimbili National Hospital → Radiology (moh_schema); Ministry of Finance (mof_schema) |
+| **6 users** | superadmin, moh_admin, mnh_manager, rad_clerk, moh_auditor, mof_admin (all password: `Admin@123`) |
+| **13 assets** | 9 for Ministry of Health + 4 for Ministry of Finance |
+| **Audit logs** | Sample login, create, and update records per ministry |
+
+**Keycloak sync:**
+- By default, users are ALSO created in Keycloak so SSO web login works immediately
+- If Keycloak is not running, use `--no-keycloak`:
+  ```bash
+  python manage.py setup_demo_data --no-keycloak
+  ```
+  Users will exist in Django only (API login works, SSO login will not).
+
+**Flags:**
+```bash
+python manage.py setup_demo_data              # Full reset + Keycloak sync (default)
+python manage.py setup_demo_data --no-keycloak # Full reset, skip Keycloak
+python manage.py setup_demo_data --clean       # Clean only (no seed)
+python manage.py setup_demo_data --seed        # Seed only (no clean)
+```
+
+Run with no flags for a complete reset. One command. Every time. Predictable.
+
+**State after running this command:**
+
+```
+=== USERS ===
+  ID 28: superadmin  | SUPER_ADMIN    | schema=None
+  ID 29: moh_admin   | MINISTRY_ADMIN | schema=moh_schema
+  ID 30: mnh_manager | AGENCY_MANAGER | schema=moh_schema
+  ID 31: rad_clerk   | FACILITY_CLERK | schema=moh_schema
+  ID 32: moh_auditor | AUDITOR        | schema=moh_schema
+  ID 33: mof_admin   | MINISTRY_ADMIN | schema=mof_schema
+  Total: 6 users (all password: Admin@123)
+
+=== MINISTRIES (with data) ===
+  moh_schema — 9 assets, 3 audit logs, 5 categories, 3 org units
+  mof_schema — 4 assets, 3 audit logs, 5 categories, 1 org unit
+
+=== ASSETS ===
+  moh_schema (9): Dell Laptop, HP Printer, Cisco Switch, Samsung TV,
+                  Land Cruiser Prado, Hiace Ambulance, Haematology Analyzer,
+                  Patient Monitor, Executive Desk Set
+  mof_schema (4): HP EliteBook Laptop, Lenovo Desktop,
+                  Toyota Fortuner, Conference Furniture Set
+
+=== AUDIT LOGS ===
+  Each ministry with assets: 1 LOGIN + 1 CREATE + 1 UPDATE
+
+Orphan users (test_user, mos_admin, moa_admin) deleted.
+Stale schemas (moe_schema, mos_schema, moa_schema) remain with no data.
+```
+
+Run `--seed` to recreate without cleaning. Run `--clean` for a blank slate.
 
 ---
 
@@ -4734,6 +5609,121 @@ Any group can call this endpoint with a user's JWT token and instantly know thei
 **If they ask: "How is your project different from the other groups?"**
 
 > *"We are the platform team. Other groups focus on specific business modules — asset register, maintenance, finance, GIS, compliance. We focus on security, identity, and data isolation. Without our platform, the other groups would have no authentication system, no user management, no audit trail, and no data isolation between ministries. Every single group depends on us."*
+
+<a name="part-26g"></a>
+### Why Group 1 Has Asset Registration (When Group 2 Is the Asset Register)
+
+**The question you will get:**
+> *"Group 2 is supposed to build the asset register. Why does your system also have asset registration? Isn't that overlapping?"*
+
+**The honest answer:**
+
+The asset registration code in Group 1's platform is a **proof-of-concept reference implementation**, not a competing module. It exists for two specific reasons:
+
+1. **To prove multi-tenancy works.** Without assets stored in separate schemas, Group 1 cannot demonstrate that Ministry of Health data is isolated from Ministry of Finance data. The panel needs to see two different sets of assets under two different logins, confirmed by two different database schemas. Login pages and user lists alone don't prove data isolation.
+
+2. **To provide demo seed data.** When showing the system to evaluators, Group 1 needs 13 realistic assets across two ministries so panelists can click around, see real data, and understand the user interface. Empty tables do not make a convincing demo.
+
+**How it coexists with Group 2's module:**
+
+There are three scenarios, and you are prepared for all of them:
+
+| Scenario | What happens | What you say |
+|---|---|---|
+| **Group 2 built a Django app** that extends our Asset model | Group 2's app adds richer fields (classifications, documents) alongside our simple asset records. Both live in the same database, same schemas, protected by our multi-tenancy. | *"Our asset registration is a minimal reference implementation to demonstrate the platform. Group 2 builds the full-featured asset register on top of our foundation."* |
+| **Group 2 built a standalone system** that calls our API | Their system has its own asset database. Our internal assets are just demo data for our own UI. No data conflict. | *"Our internal assets are demo seed data for the platform UI. Group 2's system authenticates through our API and manages their own asset records independently."* |
+| **Group 2 did not build a working asset register** | Our asset registration becomes the fallback that makes the overall project demo possible. | *"We built asset registration as a proof of concept to demonstrate multi-tenancy. It serves as a reference for how any group can build on our platform."* |
+
+**The key point for the panel:**
+
+> *"Asset registration was never in Group 1's scope. Our deliverables are authentication, RBAC, multi-tenancy, audit trails, master data, and the REST API. The asset CRUD screens you see are a reference implementation — they prove that our multi-tenant platform actually works end-to-end. Group 2's module is the production-grade asset register. Our simple version either becomes demo seed data or gets replaced by Group 2's implementation. Either way, they depend on our authentication, our schemas, and our API to function."*
+
+<a name="part-26i"></a>
+### What Integration Means for Group 2's System — Audit Trail, Security, and Why We Matter
+
+**The question you asked:**
+> *"Will the integration include the user's identity, role, and ministry?"*
+> *"Will audit trail and other security features also work for their system?"*
+> *"Is our work truly significant? They said all groups depend on us."*
+
+Let me answer each one clearly.
+
+---
+
+#### 1. Yes — Group 2 gets the user's identity, role, AND ministry
+
+Every API response from our system includes:
+- `user.id` — Who the user is (database record)
+- `user.username` — Their login name
+- `user.full_name` — Their real name (Amina Hassan)
+- `user.role` — Their permission level (MINISTRY_ADMIN, etc.)
+- `user.ministry_schema` — Their ministry's database schema (moh_schema)
+- `user.ministry` — Their ministry's display name (Ministry of Health)
+
+**This means Group 2 can:**
+- Show a user's name in their UI header
+- Hide buttons the user doesn't have permission for (e.g., only MINISTRY_ADMIN can create assets)
+- Scope ALL data queries to the user's ministry (never show Ministry of Finance data to a Ministry of Health user)
+- Log the user's identity in their own audit trail
+
+**Without our API, Group 2 would have no way to know:**
+> *Who is using their system? What are they allowed to do? Which ministry's data should they see?*
+
+---
+
+#### 2. Audit Trail — YES, but only for actions that go through our API
+
+There are two levels:
+
+**What our system logs automatically:**
+| Action | Logged in our AuditLog? | Details |
+|--------|------------------------|---------|
+| User logs in via our API | ✅ Yes | IP address, timestamp, username |
+| User logs out | ✅ Yes | Refresh token blacklisted + logout record |
+| Token refresh | ❌ No | Not logged (no security value) |
+
+**What depends on how Group 2 integrates:**
+
+| Integration method | Audit trail for asset operations | Security features active |
+|---|---|---|
+| **Group 2 calls our API** for every CRUD operation on assets | ✅ Full audit — every create, update, delete logged with old/new values, IP, user | ✅ All 15 security features (lockout, JWT, RBAC, multi-tenancy, etc.) |
+| **Group 2 has their own database** and only calls our API for login/verify | ❌ Only login/logout are logged in our system. Group 2 must build their own audit trail | ✅ Authentication + role info is secure. Data isolation is Group 2's responsibility |
+
+**For the panel:**
+> *"Our platform guarantees that every authentication event is logged. For asset operations, if Group 2 uses our API endpoints, the audit trail is automatic. If they store data in their own system, they need their own audit trail — but our API still tells them who performed each action."*
+
+---
+
+#### 3. Is Group 1's work truly significant? The honest answer.
+
+**Short answer: Yes. Without Group 1, Groups 2-10 cannot function as designed.**
+
+Here is the exact dependency:
+
+| What Group 1 provides | What happens if Group 1's system is down |
+|----------------------|------------------------------------------|
+| **User login** | No user in any group's system can log in. Every system is locked. |
+| **Role info** | No group knows what a user is allowed to do. All permissions are blind. |
+| **Ministry identity** | No group knows which ministry's data to show. Data leaks between ministries. |
+| **Master data** | Categories, cost centers, location types — none available for dropdowns. |
+| **Token verification** | Every API call from any group fails with 401. The entire ecosystem stops. |
+
+**The dependency matrix says it clearly:**
+
+```
+Group 1 depends on: NOBODY
+Group 2 depends on: Group 1
+Group 3 depends on: Group 1, Group 2
+Group 4 depends on: Group 1, Group 2, Group 9
+...
+Group 10 depends on: ALL groups
+```
+
+**Group 1 is the ONLY group that depends on nobody.** Every other group needs Group 1 for their system to work at all. This is not exaggeration — without authentication, there is no session, no user identity, no role, no ministry context, no data isolation. Each group's system would be a standalone app with no connection to the rest of the project.
+
+**What you should say to the panel:**
+
+> *"Our platform is the authentication and security foundation for the entire 10-group project. When a user logs into Group 2's system, Group 2 calls our API to verify the user's identity and get their role and ministry. Without this call, Group 2 cannot know who the user is or what they should see. Every single group depends on this same mechanism. We are the only group that depends on nobody — because we are the foundation everything else is built on."*
 
 ---
 
