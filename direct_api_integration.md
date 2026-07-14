@@ -11,7 +11,7 @@
 
 Use this guide if your group **already built your own login page** and you want users to log in on your site, not on ours. Your login form sends the credentials to our API, we verify them, and we return a JWT token.
 
-If your group does NOT have a login page, use the **SSO Integration Guide** (`group2_api_integration.md`) instead — it's simpler (you don't need to build anything).
+If your group does NOT have a login page, use the **SSO Integration Guide** (`EXTERNAL_SSO_INTEGRATION.md`) instead — it's simpler (you don't need to build anything).
 
 ---
 

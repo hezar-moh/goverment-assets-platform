@@ -27,3 +27,19 @@ in mobile => go to  lib/config/api_config.dart , then  change the API base URL f
 http://192.168.100.18:8000
 to:
 https://goverment-assets-platform-production.up.railway.app
+
+
+to check keycloak versions
+Keycloak versions:
+- Local: Open PowerShell in C:\keycloak-25.0.1\bin and run .\kc.bat --version
+- Railway: You already saw it — 26.1.5 in Server Info
+
+
+# Demo User Management
+
+Use the appropriate command based on your situation.
+
+| Command | When to Use | What It Does |
+|---------|-------------|--------------|
+| `python manage.py setup_demo_data` | **First-time setup** or whenever you want to **reset the demo environment**. | Recreates Django demo users, demo assets, audit logs, **and** Keycloak users. |
+| `python manage.py sync_keycloak_attribu` | When **Keycloak users already exist** but are missing the `role` and `ministry_schema` attributes (for example, after the Railway deployment issue). | Updates existing Keycloak users by adding the missing `role` and `ministry_schema` attributes without recreating the users. |

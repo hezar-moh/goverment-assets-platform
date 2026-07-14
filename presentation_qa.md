@@ -49,6 +49,7 @@
 | 29 | [Confidence Tips](#part-29) | Posture, eye contact, voice, recovery |
 | 30 | [Deployment Guide](#part-30) | Full Railway setup, every change explained, database, reset, Keycloak, mobile |
 
+
 ---
 
 <a name="part-1"></a>
@@ -6363,7 +6364,7 @@ These are set in Railway Dashboard → Django Service → Variables tab:
 | `KEYCLOAK_SERVER_URL` | `https://keycloak-production-4f96.up.railway.app` | Django talks to Railway's Keycloak |
 | `KEYCLOAK_CLIENT_ID` | `govasset-django` | OIDC client ID for SSO |
 | `KEYCLOAK_CLIENT_SECRET` | (the secret copied from Keycloak admin) | OIDC client secret for SSO |
-| `KEYCLOAK_ADMIN_USERNAME` | `admin` | Django connects to Keycloak admin API |
+| `KEYCLOAK_ADMIN_USERNAME` | `superadmin` | Django connects to Keycloak admin API |
 | `KEYCLOAK_ADMIN_PASSWORD` | `Admin@123` | Keycloak admin password |
 | `PLATFORM_BASE_URL` | `https://goverment-assets-platform-production.up.railway.app` | Used in logout redirect and emails |
 | `CSRF_TRUSTED_ORIGINS` | (optional, for POST requests) | Prevents CSRF errors on Railway |
@@ -6389,7 +6390,7 @@ Set in Railway Dashboard → Keycloak Service → Variables tab:
 | `KC_HOSTNAME` | `https://keycloak-production-4f96.up.railway.app` | Keycloak's public URL (required for proper redirects) |
 | `KC_PROXY` | `edge` | Required behind Railway's proxy — prevents redirect loops |
 | `KC_HOSTNAME_STRICT` | `false` | Allows Keycloak to work behind Railway's proxy |
-| `KEYCLOAK_ADMIN` | `admin` | Admin console username |
+| `KEYCLOAK_ADMIN` | `superadmin` | Admin console username |
 | `KEYCLOAK_ADMIN_PASSWORD` | `Admin@123` | Admin console password |
 | `JAVA_OPTS_APPEND` | `-Xmx256m -Xms128m` | Limits Java memory (free tier only has 1GB) |
 
@@ -6826,3 +6827,5 @@ Then push this `Dockerfile` to GitHub and deploy it on Railway. But this is unne
 | Django env vars | `.env` file | Railway Variables tab |
 | Keycloak env vars | Command-line args | Railway Variables tab |
 | ngrok needed? | Only for sharing | No — Railway gives permanent URL |
+
+<!-- Parts 31-34 moved to LOCAL_VS_ONLINE_GUIDE.md -->
