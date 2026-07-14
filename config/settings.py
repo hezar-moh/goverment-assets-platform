@@ -384,6 +384,9 @@ KEYCLOAK_REALM        = config('KEYCLOAK_REALM',      default='govasset')
 KEYCLOAK_CLIENT_ID    = config('KEYCLOAK_CLIENT_ID',  default='govasset-django')
 KEYCLOAK_CLIENT_SECRET = config('KEYCLOAK_CLIENT_SECRET', default='')
 
+KEYCLOAK_ADMIN_USERNAME = config('KEYCLOAK_ADMIN_USERNAME', default='admin')
+KEYCLOAK_ADMIN_PASSWORD = config('KEYCLOAK_ADMIN_PASSWORD', default='admin123')
+
 _KEYCLOAK_BASE = f"{KEYCLOAK_SERVER_URL}/realms/{KEYCLOAK_REALM}/protocol/openid-connect"
 
 OIDC_OP_AUTHORIZATION_ENDPOINT = f"{_KEYCLOAK_BASE}/auth"

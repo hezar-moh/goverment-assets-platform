@@ -219,6 +219,61 @@ class KeycloakAdminService:
             first += page_size
         return all_users
 
+    def ensure_custom_attributes_defined(self):
+        """Declare role + ministry_schema in the realm's user profile (Keycloak 26+).
+
+        Keycloak 26+ silently drops undeclared attributes.  Call this once before
+        any create/update that sets custom attributes.
+        """
+        headers  = self._get_headers()
+        url = f"{self.server_url}/admin/realms/{self.realm}/users/profile"
+
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code != 200:
+            logger.warning("Could not fetch user profile (old Keycloak?).")
+            return
+
+        profile = resp.json()
+        existing = {a['name'] for a in profile.get('attributes', [])}
+        to_add = []
+
+        if 'role' not in existing:
+            to_add.append({
+                'name': 'role',
+                'displayName': 'Role',
+                'permissions': {
+                    'view': ['admin', 'user'],
+                    'edit': ['admin', 'user'],
+                },
+                'multivalued': False,
+            })
+        if 'ministry_schema' not in existing:
+            to_add.append({
+                'name': 'ministry_schema',
+                'displayName': 'Ministry Schema',
+                'permissions': {
+                    'view': ['admin', 'user'],
+                    'edit': ['admin', 'user'],
+                },
+                'multivalued': False,
+            })
+
+        if not to_add:
+            return  # already defined
+
+        profile['attributes'] = profile.get('attributes', []) + to_add
+        put_resp = requests.put(url, json=profile, headers=headers, timeout=10)
+        if put_resp.status_code not in (200, 204):
+            logger.error(
+                f"Failed to update user profile: {put_resp.status_code} "
+                f"{put_resp.text}"
+            )
+        else:
+            logger.info(
+                f"Added custom attributes to realm profile: "
+                f"{[a['name'] for a in to_add]}"
+            )
+
     def reset_password(self, keycloak_id, new_password):
         """Reset a user's password in Keycloak."""
         headers  = self._get_headers()
