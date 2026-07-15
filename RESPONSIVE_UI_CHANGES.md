@@ -159,6 +159,151 @@ Added a `.table-responsive-wrap` utility class for smoother horizontal table scr
   │ 1 per row   │ 2-3 per row │ auto-wrap            │
 ```
 
+---
+
+## Panel Q&A — Answering Questions About Responsiveness
+
+These are likely panel questions and how to answer them.
+
+### Q1: "Is your system responsive or fluid?"
+
+**Answer:** "It is both, but the proper term is **responsive**. Responsive means the layout adapts to different screen sizes using CSS media queries. Fluid means elements use relative units (%) instead of fixed units (px). Our system uses a combination of both:
+
+| Term | What it means | Example in our system |
+|------|--------------|----------------------|
+| **Responsive** | Layout changes at breakpoints | `< 900px` sidebar hides, grids collapse to single column |
+| **Fluid** | Elements stretch/shrink with the viewport | `.stat-grid` uses `minmax(200px, 1fr)` — cards auto-fill available space |
+
+Our login form panel went from a fluid width back to... well it is both."
+
+### Q2: "What specifically makes your system responsive? Which CSS properties?"
+
+**Answer:** "Three CSS technologies work together:"
+
+**a) Media Queries** — the foundation of responsive design
+```css
+@media (max-width: 900px) {
+  /* rules for tablets & phones */
+}
+@media (max-width: 480px) {
+  /* rules for small phones */
+}
+```
+
+**b) CSS Grid with auto-fit**
+```css
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  /* Cards automatically wrap to the next row when container shrinks */
+}
+```
+
+**c) Flexbox with wrap**
+```css
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;   /* items wrap to next line when they don't fit */
+}
+```
+
+**d) Transform (for the mobile sidebar)**
+```css
+.sidebar {
+  transform: translateX(-100%);  /* slide off-screen */
+  transition: transform 0.3s ease;
+}
+.sidebar.open {
+  transform: translateX(0);      /* slide back in */
+}
+```
+
+**e) CSS Selectors targeting inline styles** (for collapsing two-column forms)
+```css
+.page-body [style*="grid-template-columns"][style*="px"] {
+  grid-template-columns: 1fr !important;  /* force single column */
+}
+```
+
+**Summary table:**
+
+| CSS Feature | What it does | Where we use it |
+|-------------|-------------|-----------------|
+| `@media (max-width: ...)` | Applies rules only below a screen width | Two breakpoints: 900px, 480px |
+| `grid-template-columns: repeat(auto-fit, minmax(..., 1fr))` | Auto-wraps items to next row when they don't fit | Dashboard stat cards |
+| `flex-wrap: wrap` | Flex items wrap to next line | Filter bars, page headers |
+| `transform: translateX()` | Slides sidebar off-screen | Mobile sidebar toggle |
+| `display: none/block` | Shows/hides elements | Login branding panel, hamburger toggle, sidebar overlay |
+
+### Q3: "How would you remove the responsiveness so the system is desktop-only again?"
+
+**Answer:** "I would make these changes:"
+
+| Step | What to change | How |
+|------|---------------|-----|
+| 1 | Remove or empty the media query blocks | Delete lines 804-941 in `static/css/style.css` (the two `@media` blocks) |
+| 2 | Remove the hamburger toggle visibility rule | Delete or comment out `media (max-width: 900px) { .sidebar-toggle { display: flex; } }` — but keep the button in the HTML, just hide it |
+| 3 | Restore sidebar to always-visible | Remove `transform: translateX(-100%)` from the `.sidebar` rule in the media query (or just delete the whole media query) |
+| 4 | Reset main-wrap margin | Ensure `.main-wrap` has `margin-left: var(--sidebar-width)` (260px) at all screen sizes |
+| 5 | Restore login two-panel layout | Remove the login-outer media query overrides so the branding panel and form panel sit side-by-side on all screens |
+| 6 | Restore two-column grids | Remove the CSS selectors that force `grid-template-columns: 1fr !important` on mobile |
+| 7 | Remove the sidebar overlay from base.html | Delete the `<div id="sidebar-overlay">` from `templates/shared/base.html` |
+| 8 | Remove the hamburger button from base.html | Delete the `<button class="sidebar-toggle">` from `templates/shared/base.html` |
+| 9 | Remove the JavaScript toggle | Delete the `<script>function toggleSidebar()...</script>` from `templates/shared/base.html` |
+| 10 | Remove `.login-outer` class from login.html | Change `<div class="login-outer" ...>` back to just `<div ...>` in `templates/authentication/login.html` |
+
+> **Simplest answer:** "Delete the `@media` blocks from the CSS, remove the hamburger + overlay + JS from base.html, and remove the login-outer class. The site goes back to desktop-only."
+
+### Q4: "What breakpoints did you use and why?"
+
+**Answer:** "Two breakpoints:"
+
+| Breakpoint | Target devices | Why this value |
+|-----------|---------------|----------------|
+| `900px` | Tablets (iPad portrait: 768px) and phones | 900px catches iPad Mini (768px), iPad Air (820px), and phones. The sidebar becomes a hamburger menu below this width. |
+| `480px` | Small phones (iPhone SE: 375px) | Below 480px, stat cards become single column and fonts shrink slightly to fit the narrowest screens. |
+
+The Android ecosystem ranges from 360px (small phones) to 820px (tablets), and iOS from 375px (iPhone) to 1024px (iPad landscape). 900px and 480px cover all these
+cases.
+
+### Q5: "How did you test the responsive design?"
+
+**Answer:** "We used Google Chrome's built-in device emulation (DevTools → Toggle Device Toolbar, Ctrl+Shift+M), which lets us simulate specific phones and tablets:
+
+| Device tested | Screen width | What we checked |
+|--------------|-------------|-----------------|
+| iPhone 14 Pro Max | 430px | Login page, sidebar toggle, forms, dashboard |
+| iPhone SE | 375px | Smallest phone — stat cards, buttons, fonts |
+| iPad Mini | 768px | Tablet — sidebar behaviour at the 900px breakpoint |
+| iPad Pro (portrait) | 1024px | Just above the 900px breakpoint — desktop layout |
+
+### Q6: "What is the difference between responsive and adaptive?"
+
+**Answer:**
+
+| Approach | How it works | Example |
+|----------|-------------|---------|
+| **Responsive** | Layout flows fluidly and gradually rearranges as the screen gets narrower or wider | CSS Grid with `auto-fit` — cards wrap naturally as space changes |
+| **Adaptive** | Layout has fixed "snap points" — it jumps between preset designs at specific widths | Our sidebar: always visible on desktop, hidden on mobile with a hamburger toggle at exactly 900px |
+
+Our system uses **both**: the stat cards are responsive (they wrap fluidly), while the sidebar toggle is adaptive (it switches at 900px). Most modern sites combine both approaches.
+
+### Q7: "Why did you use `!important` in the CSS? Is that bad practice?"
+
+**Answer:** "We used `!important` only for the media query overrides that target **inline styles** — specifically the two-column grids that were written directly in the HTML templates:
+
+```css
+@media (max-width: 900px) {
+  .page-body [style*="grid-template-columns"][style*="px"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+```
+
+Inline styles normally have the highest specificity and cannot be overridden by a class selector without `!important`. This was the pragmatic choice because rewriting every template to use CSS classes instead of inline styles would have required modifying 15+ templates. In a production app, we would refactor the inline styles into proper CSS classes, but for this project `!important` is an acceptable shortcut for making the site mobile-friendly."
+
+---
+
 ## Verification Checklist
 
 Test each of these on a phone (or Chrome DevTools with device emulation, Ctrl+Shift+M):
