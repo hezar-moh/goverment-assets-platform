@@ -7,6 +7,289 @@ A complete beginner's guide to every test in this project, how the code works, a
 
 ---
 
+## All Testing Files Explained
+
+Here is every file related to testing in this project, what it does, and what each line inside it means.
+
+### `pytest.ini` — The Test Runner Configuration
+
+**Location:** `D:\government_asset_platform\pytest.ini`
+
+**What it is:** A configuration file for pytest (the tool that finds and runs your unit tests). When you type `python -m pytest`, pytest reads this file to know what to do.
+
+**The file (4 lines):**
+
+```ini
+[pytest]
+DJANGO_SETTINGS_MODULE = config.settings
+python_files = tests.py test_*.py
+testpaths = authentication assets organizations tenants
+```
+
+| Line | What it does |
+|------|-------------|
+| `[pytest]` | Tells Python "these are pytest settings" |
+| `DJANGO_SETTINGS_MODULE = config.settings` | Tells pytest which Django settings file to use (so it knows about your database, apps, etc.) |
+| `python_files = tests.py test_*.py` | Tells pytest "look for files named `tests.py` or starting with `test_`" |
+| `testpaths = authentication assets organizations tenants` | Tells pytest "only search in these four folders" (faster than searching the whole project) |
+
+**Without this file:** you would have to type `python -m pytest --ds=config.settings authentication/ tests/` every time.
+
+---
+
+### `conftest.py` — The Plugin Connector
+
+**Location:** `D:\government_asset_platform\conftest.py`
+
+**What it is:** A special file pytest looks for automatically. It can define shared test fixtures, hooks, and plugins used across multiple test files.
+
+**The file:**
+
+```python
+pytest_plugins = [
+    'assets.tests',
+    'authentication.tests',
+    'organizations.tests',
+    'tenants.tests',
+]
+```
+
+| Part | What it does |
+|------|-------------|
+| `pytest_plugins = [...]` | Tells pytest "these modules contain test plugins" |
+| `'assets.tests', 'authentication.tests', ...` | Lists the four test modules so pytest loads them explicitly |
+
+This file ensures pytest discovers all test classes even if they use advanced features like `TenantTestCase`.
+
+---
+
+### `postman_collection.json` — The API Integration Tests
+
+**Location:** `D:\government_asset_platform\postman_collection.json`
+
+**What it is:** A JSON file that Postman (a desktop app) imports to create a collection of API requests. It contains 13 API tests that run in a specific order.
+
+**What JSON means:** JSON (JavaScript Object Notation) is a way to store data as text. It looks like this:
+```json
+{
+  "key": "value",
+  "numbers": 123,
+  "lists": ["item1", "item2"],
+  "objects": {"nested": "data"}
+}
+```
+
+**The file structure explained:**
+
+```
+postman_collection.json
+│
+├── info              → Collection name and description (shown in Postman)
+│
+├── variable          → Variables available to ALL requests
+│   ├── base_url      → The API URL (e.g., http://localhost:8000)
+│   ├── access_token  → Empty at start, filled by Login test
+│   └── asset_id      → Empty at start, filled by Create Asset test
+│
+└── item              → The actual test requests, grouped into folders
+    │
+    ├── Authentication folder
+    │   ├── 1. Login          → POST /api/auth/login/
+    │   ├── 2. Get My Profile → GET  /api/auth/me/
+    │   ├── 3. Verify Token   → POST /api/auth/verify-token/
+    │   ├── 4. Reject unauth  → GET  /api/auth/me/  (NO token — expects 401)
+    │   └── 5. Refresh Token  → POST /api/auth/refresh/
+    │
+    ├── Assets folder
+    │   ├── 6. List Assets       → GET    /api/assets/
+    │   ├── 7. Create Asset      → POST   /api/assets/
+    │   ├── 8. Get Asset Detail  → GET    /api/assets/{id}/
+    │   ├── 9. Update Asset      → PUT    /api/assets/{id}/
+    │   └── 10. Delete Asset     → DELETE /api/assets/{id}/
+    │
+    └── Organisation & Dashboard folder
+        ├── 11. List Org Units   → GET /api/org-units/
+        ├── 12. View Audit Logs  → GET /api/audit-logs/
+        └── 13. Dashboard Stats  → GET /api/dashboard/stats/
+```
+
+**How variables flow between tests (the key concept):**
+
+Postman has **collection variables** — like global variables that all requests can read and write.
+
+1. **Login test** sends username/password → receives `{"access": "eyJ...", "refresh": "eyJ..."}`
+2. **Login's test script** (lines 33-34 in the JSON) runs after the response:
+   ```javascript
+   var jsonData = pm.response.json();
+   pm.collectionVariables.set('access_token', jsonData.access);
+   ```
+   This saves the JWT into the `access_token` variable.
+3. **Every other request** has an `Authorization: Bearer {{access_token}}` header.
+   `{{access_token}}` is Postman's syntax for "replace this with the variable's value."
+4. **Create Asset test** (line 227) also saves the new asset's ID:
+   ```javascript
+   pm.collectionVariables.set('asset_id', jsonData.id);
+   ```
+5. **Get/Update/Delete Asset** use `{{asset_id}}` in the URL path.
+
+**How test scripts (assertions) work:**
+
+Each request has an `event` section with JavaScript that runs after the response:
+
+```javascript
+pm.test('Login successful', function () {
+    pm.response.to.have.status(200);        // Assert: status code is 200
+    pm.expect(jsonData.access).to.not.be.empty;  // Assert: access token is not empty
+});
+```
+
+If any `pm.expect(...)` fails, Postman marks that test as failed in red.
+
+**To remove:** just delete the file `postman_collection.json`. Or don't import it into Postman.
+
+---
+
+### `locustfile.py` — The Load Testing Script
+
+**Location:** `D:\government_asset_platform\locustfile.py`
+
+**What it is:** A Python script for Locust, a load-testing tool. It simulates 50 ministry staff using the platform at the same time and measures response times.
+
+**Line-by-line explanation:**
+
+```python
+from locust import HttpUser, task, between, tag
+```
+Imports the building blocks from the Locust library:
+- `HttpUser` — a simulated user that makes HTTP requests
+- `task` — marks a method as something the user does (like "list assets")
+- `between` — sets a random wait time between tasks (simulates human reading)
+- `tag` — labels tasks so you can run specific groups
+
+```python
+class MinistryStaffUser(HttpUser):
+    """Simulates a ministry staff member..."""
+```
+Defines the virtual user. Locust will create 50 copies of this class, each running independently.
+
+```python
+    wait_time = between(3, 8)
+```
+Each virtual user waits 3-8 seconds between tasks (simulates a person reading the screen).
+
+```python
+    def on_start(self):
+        """Log in when the virtual user starts."""
+        self.login_data = {
+            'username': 'moh_admin',
+            'password': 'Admin@123',
+        }
+        response = self.client.post('/api/auth/login/', json=self.login_data)
+        if response.status_code == 200:
+            body = response.json()
+            self.access_token = body.get('access', '')
+            self.headers = {
+                'Authorization': f'Bearer {self.access_token}',
+                'Content-Type': 'application/json',
+            }
+```
+`on_start` runs once when the virtual user is created. It logs in via the API and saves the JWT token. All subsequent tasks use this token in the headers.
+
+```python
+    @tag('assets')
+    @task(5)
+    def list_assets(self):
+        """Load the asset list — most frequent operation."""
+        if self.access_token:
+            self.client.get('/api/assets/', headers=self.headers)
+```
+- `@task(5)` — this task runs 5 times more often than a `@task(1)` task. The number is a **weight**.
+- `@tag('assets')` — labels this task. You can run only asset-related tasks with `locust --tags assets`.
+- `self.client.get(...)` — Locust measures how long this takes and records it.
+
+```python
+    @tag('assets')
+    @task(3)
+    def view_asset_detail(self):
+        if self.access_token:
+            list_resp = self.client.get('/api/assets/?page=1', headers=self.headers)
+            if list_resp.status_code == 200:
+                data = list_resp.json()
+                results = data.get('results', [])
+                if results:
+                    asset_id = results[0]['id']
+                    self.client.get(f'/api/assets/{asset_id}/', headers=self.headers)
+```
+This shows how a real user behaves: first list assets, pick the first one, and view its details. The `name='/api/assets/{id}/'` parameter groups all detail requests under one label in the results.
+
+```python
+    @task(2)
+    def view_audit_logs(self):
+        if self.access_token:
+            self.client.get('/api/audit-logs/', headers=self.headers)
+
+    @task(2)
+    def view_dashboard_stats(self):
+        if self.access_token:
+            self.client.get('/api/dashboard/stats/', headers=self.headers)
+
+    @task(1)
+    def view_profile(self):
+        if self.access_token:
+            self.client.get('/api/auth/me/', headers=self.headers)
+
+    @task(1)
+    def verify_token(self):
+        if self.access_token:
+            self.client.post('/api/auth/verify-token/', json={'token': self.access_token})
+
+    @task(1)
+    def refresh_token(self):
+        if self.access_token:
+            self.client.post('/api/auth/refresh/', json={'refresh': self.access_token})
+```
+These are progressively less frequent tasks. The weight system:
+- `@task(5)`: list assets (most common action)
+- `@task(3)`: view asset detail
+- `@task(2)`: view audit logs, dashboard stats (moderately common)
+- `@task(1)`: profile, verify, refresh (least common)
+
+So out of every ~15 tasks a user performs:
+- 5 are listing assets
+- 3 are viewing asset details
+- 2 are viewing audit logs
+- 2 are viewing dashboard
+- 1 is viewing profile
+- 1 is verifying token
+- 1 is refreshing token
+
+```python
+    def on_stop(self):
+        """Log out when the virtual user stops."""
+        if self.access_token:
+            self.client.post('/api/auth/logout/', headers=self.headers)
+```
+`on_stop` runs when the virtual user stops (after the test duration ends). It logs out properly.
+
+**How to explain this to a panel:** "Locust creates 50 copies of this class, each running its own loop. Each copy waits 3-8 seconds between actions (simulating a person reading), then randomly picks an action based on the weights. List assets runs 5 times more often than profile. It's designed to mimic real ministry staff behaviour."
+
+**To remove:** just delete `locustfile.py`.
+
+---
+
+### The Four `tests.py` Files — The Unit Tests
+
+| File | Location | Tests |
+|------|----------|-------|
+| `authentication/tests.py` | `D:\government_asset_platform\authentication\tests.py` | User roles, permission classes, brute-force lockout, unlock tokens |
+| `assets/tests.py` | `D:\government_asset_platform\assets\tests.py` | Asset expiry dates, warranty, auto-numbering |
+| `organizations/tests.py` | `D:\government_asset_platform\organizations\tests.py` | Audit log tamper protection, OrgUnit hierarchy, MasterData |
+| `tenants/tests.py` | `D:\government_asset_platform\tenants\tests.py` | Ministry model and schema creation |
+
+**To remove:** delete any of these files and that specific set of tests stops running.
+
+---
+
 ## Contents
 
 1. [Unit Testing (pytest)](#1-unit-testing-pytest) — automated tests that check individual pieces of code
@@ -684,6 +967,23 @@ It proves that:
 6. **Org unit hierarchy** — the three-level ministry → agency → facility structure works
 7. **Master data** — lookup values have correct constraints and defaults
 8. **Ministry model** — schema creation and defaults work
+
+### "Where did these files come from? Where is pytest.ini, locustfile.py, postman_collection.json?"
+
+These files were all **created by the developer** and stored in the project folder:
+
+| File | Who created it | Why it exists | If deleted |
+|------|---------------|--------------|------------|
+| `pytest.ini` | Developer | So `python -m pytest` knows where to find tests without typing extra flags | Unit tests won't run unless you type the full command manually |
+| `conftest.py` | Developer | Ensures pytest finds all test modules even with complex setup | Most tests still work; some edge cases might not be discovered |
+| `locustfile.py` | Developer | Defines what 50 simulated users do (login → list assets → check dashboard) | Load testing stops working |
+| `postman_collection.json` | Developer | A portable file anyone can import into Postman to test the API | Integration testing stops working |
+| `authentication/tests.py` | Developer | 42 unit tests for user roles, permissions, lockout | 42 specific tests are lost |
+| `assets/tests.py` | Developer | 21 unit tests for asset model | Asset-specific tests are lost |
+| `organizations/tests.py` | Developer | 17 unit tests for audit log, org structure | Organisation-specific tests are lost |
+| `tenants/tests.py` | Developer | 3 unit tests for ministry model | Ministry-specific tests are lost |
+
+**What if the panel asks "did you write these yourself?":** "Yes, I wrote every line. I started with the `tests.py` files to test the models one by one, then added `postman_collection.json` to test the full API flow, then `locustfile.py` to prove the platform handles 50 concurrent users under 3 seconds."
 
 ### "What would make these tests fail?"
 
