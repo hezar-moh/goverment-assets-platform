@@ -262,7 +262,7 @@ class DashboardStatsAPIView(APIView):
 
                 expirable = Asset.objects.filter(
                     asset_expiry_date__isnull=False,
-                    status='ACTIVE'
+                    status__in=['ACTIVE', 'PLANNED', 'UNDER_MAINTENANCE'],
                 ).select_related('category').order_by(
                     'asset_expiry_date'
                 )

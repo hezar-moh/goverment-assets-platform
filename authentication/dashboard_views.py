@@ -82,7 +82,10 @@ def _get_ministry_stats(schema_name):
             total_audit = AuditLog.objects.count()
 
             expirable = (
-                Asset.objects.filter(asset_expiry_date__isnull=False, status="ACTIVE")
+                Asset.objects.filter(
+                    asset_expiry_date__isnull=False,
+                    status__in=['ACTIVE', 'PLANNED', 'UNDER_MAINTENANCE'],
+                )
                 .select_related("category")
                 .order_by("asset_expiry_date")
             )
