@@ -161,6 +161,55 @@ Added a `.table-responsive-wrap` utility class for smoother horizontal table scr
 
 ---
 
+## Complete Attribute Inventory — Every Responsive Rule, Its Location, and How to Remove It
+
+This table lists every single CSS property and HTML element that makes the system responsive. If you need to answer "where exactly is this attribute?" or "what would you delete to remove responsiveness?", use this.
+
+### CSS Properties
+
+| # | CSS Property / Rule | File | Lines | What it does | To remove responsiveness |
+|---|-------------------|------|-------|-------------|------------------------|
+| 1 | `.sidebar-toggle { display: none; }` | `static/css/style.css` | 763-764 | Hides the hamburger button on desktop | Delete lines 763-781 |
+| 2 | `.sidebar-overlay { display: none; ... }` | `static/css/style.css` | 784-795 | Hides the dark overlay backdrop on desktop | Delete lines 784-795 |
+| 3 | `.login-outer { ... }` | `static/css/style.css` | 798-802 | Wrapper class for login page layout | Delete lines 798-802 |
+| 4 | `@media (max-width: 900px) { ... }` | `static/css/style.css` | 807-905 | **Main responsive block** — controls sidebar, login, grids, spacing | Delete lines 807-905 |
+| 5 | `@media (max-width: 900px) { .sidebar { transform: translateX(-100%); ... } }` | `static/css/style.css` | 809-813 | Slides sidebar off-screen on mobile | Delete lines 809-813 (inside the media query) |
+| 6 | `@media (max-width: 900px) { .sidebar.open { transform: translateX(0); } }` | `static/css/style.css` | 814-816 | Slides sidebar back in when hamburger is tapped | Delete lines 814-816 |
+| 7 | `@media (max-width: 900px) { .sidebar-overlay { display: block; ... } }` | `static/css/style.css` | 817-824 | Shows the dark backdrop on mobile | Delete lines 817-824 |
+| 8 | `@media (max-width: 900px) { .sidebar-toggle { display: flex; } }` | `static/css/style.css` | 825-827 | Makes hamburger button visible on mobile | Delete lines 825-827 |
+| 9 | `@media (max-width: 900px) { .main-wrap { margin-left: 0; } }` | `static/css/style.css` | 830-832 | Removes the 260px sidebar margin so content fills full screen | Delete lines 830-832 |
+| 10 | `@media (max-width: 900px) { .login-outer { flex-direction: column !important; } }` | `static/css/style.css` | 835-837 | Stacks login panels vertically instead of side-by-side | Delete lines 834-847 |
+| 11 | `@media (max-width: 900px) { .login-outer > div:first-child { display: none !important; } }` | `static/css/style.css` | 838-840 | Hides the left branding panel on login page | Delete lines 838-840 |
+| 12 | `@media (max-width: 900px) { .login-outer > div:last-child { width: 100% !important; ... } }` | `static/css/style.css` | 841-847 | Makes the login form panel full-width on mobile | Delete lines 841-847 |
+| 13 | `@media (max-width: 900px) { .page-body [style*="grid-template-columns"][style*="px"] { grid-template-columns: 1fr !important; } }` | `static/css/style.css` | 849-852 | Collapses two-column forms (1fr 300px) to single column | Delete lines 849-860 |
+| 14 | `@media (max-width: 900px) { .stat-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; } }` | `static/css/style.css` | 862-866 | Shrinks stat cards minimum width from 200px to 140px | Delete lines 862-866 |
+| 15 | `@media (max-width: 900px) { .filter-group { min-width: 120px; } }` | `static/css/style.css` | 868-871 | Makes filter inputs narrower on tablets | Delete lines 868-871 |
+| 16 | `@media (max-width: 900px) { .page-header { flex-direction: column; ... } }` | `static/css/style.css` | 873-881 | Stacks page header title and buttons vertically | Delete lines 873-881 |
+| 17 | `@media (max-width: 900px) { .page-body { padding: 16px; } }` | `static/css/style.css` | 883-886 | Reduces page padding from 28px to 16px | Delete lines 883-889 |
+| 18 | `@media (max-width: 900px) { .card-header-bar { flex-direction: column; ... } }` | `static/css/style.css` | 891-896 | Stacks card header title and actions vertically | Delete lines 891-896 |
+| 19 | `@media (max-width: 480px) { ... }` | `static/css/style.css` | 910-941 | **Small phone block** — stat cards single column, smaller fonts | Delete lines 910-941 |
+| 20 | `@media (max-width: 480px) { .stat-grid { grid-template-columns: 1fr; } }` | `static/css/style.css` | 910-913 | Stat cards become full-width (one per row) | Delete lines 910-913 |
+| 21 | `@media (max-width: 480px) { .filter-group { min-width: 100%; } }` | `static/css/style.css` | 914-917 | Filter inputs take full width on small phones | Delete lines 914-917 |
+| 22 | `@media (max-width: 480px) { .btn { padding: 8px 12px; font-size: 13px; } }` | `static/css/style.css` | 923-927 | Shrinks button padding and font on small phones | Delete lines 923-927 |
+| 23 | `@media (hover: none) and (pointer: coarse) { ... }` | `static/css/style.css` | 946-962 | **Touch optimisation** — larger tap targets on mobile | Delete lines 946-962 |
+| 24 | `@media (hover: none) { .sidebar-link, .btn, .btn-logout { padding-top: 11px; padding-bottom: 11px; } }` | `static/css/style.css` | 947-952 | Makes buttons taller on touch devices for easier tapping | Delete lines 947-952 |
+| 25 | `@media (hover: none) { .data-table tbody tr:hover { background: inherit; } }` | `static/css/style.css` | 958-961 | Removes hover highlight on table rows for touch devices | Delete lines 958-961 |
+
+### HTML / Template Additions
+
+| # | Element | File | Line(s) | What it does | To remove responsiveness |
+|---|---------|------|---------|-------------|------------------------|
+| 26 | `<div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()">` | `templates/shared/base.html` | 117 | Dark backdrop behind sidebar when open on mobile | Delete line 117 |
+| 27 | `<button class="sidebar-toggle" onclick="toggleSidebar()">` (hamburger icon) | `templates/shared/base.html` | 125-127 | Hamburger button in the topbar for mobile | Delete lines 125-127 |
+| 28 | `<script>function toggleSidebar() { ... }</script>` | `templates/shared/base.html` | 166-171 | JavaScript that toggles sidebar open/close | Delete lines 166-171 |
+| 29 | `class="login-outer"` (added to outer div) | `templates/authentication/login.html` | 5 | Enables the login page responsive rules | Remove `login-outer` from class attribute |
+
+### How to Completely Remove All Responsiveness (Quick Answer)
+
+> "Delete lines 760-962 from `static/css/style.css` (the hamburger, overlay, login-outer, and all 3 `@media` blocks), then delete lines 117, 125-127, and 166-171 from `templates/shared/base.html`, and remove `login-outer` from line 5 of `templates/authentication/login.html`. The system will be desktop-only again."
+
+---
+
 ## Panel Q&A — Answering Questions About Responsiveness
 
 These are likely panel questions and how to answer them.
