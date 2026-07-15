@@ -756,3 +756,207 @@ textarea.form-control { resize: vertical; min-height: 90px; }
   font-size: 12px;
   color: var(--text-muted);
 }
+
+/* ============================================
+   HAMBURGER TOGGLE (hidden on desktop)
+   ============================================ */
+.sidebar-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 20px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+  margin-right: 8px;
+}
+.sidebar-toggle:hover {
+  background: var(--bg-page);
+}
+
+/* Sidebar overlay backdrop */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 199;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.sidebar-overlay.show {
+  opacity: 1;
+}
+
+/* Login page responsive wrapper */
+.login-outer {
+  min-height: 100vh;
+  display: flex;
+  background: var(--bg-page);
+}
+
+/* ============================================
+   MOBILE (tablets & phones, < 900px)
+   ============================================ */
+@media (max-width: 900px) {
+  /* ── Sidebar ── */
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 200;
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  .sidebar-overlay {
+    display: block;
+    pointer-events: none;
+  }
+  .sidebar-overlay.show {
+    display: block;
+    pointer-events: auto;
+  }
+  .sidebar-toggle {
+    display: flex;
+  }
+
+  /* ── Main content ── */
+  .main-wrap {
+    margin-left: 0;
+  }
+
+  /* ── Login page ── */
+  .login-outer {
+    flex-direction: column !important;
+  }
+  .login-outer > div:first-child {
+    display: none !important;
+  }
+  .login-outer > div:last-child {
+    width: 100% !important;
+    flex-shrink: 1 !important;
+    min-height: 100vh;
+    padding: 40px 24px !important;
+    border-left: none !important;
+  }
+
+  /* ── Two-column grids → single column ── */
+  .page-body [style*="grid-template-columns"][style*="px"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Sub-form grids (like 1fr 1fr, 1fr 1fr 1fr) ── */
+  .page-body [style*="grid-template-columns:1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+  .page-body [style*="grid-template-columns:1fr 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Stat cards ── */
+  .stat-grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+  }
+
+  /* ── Filter bar ── */
+  .filter-group {
+    min-width: 120px;
+  }
+
+  /* ── Page header ── */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .page-header h4 {
+    font-size: 17px;
+  }
+
+  /* ── Spacing ── */
+  .page-body {
+    padding: 16px;
+  }
+  .topbar {
+    padding: 0 14px;
+  }
+
+  /* ── Card headers ── */
+  .card-header-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  /* ── Data tables: make horizontal scroll more visible ── */
+  .table-responsive-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -4px;
+    padding: 0 4px;
+  }
+}
+
+/* ============================================
+   SMALL PHONES (< 480px)
+   ============================================ */
+@media (max-width: 480px) {
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-group {
+    min-width: 100%;
+  }
+
+  .topbar-schema code {
+    font-size: 10px;
+    padding: 1px 5px;
+  }
+
+  .btn {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .stat-value {
+    font-size: 22px;
+  }
+
+  .data-table tbody td {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+  .data-table thead th {
+    padding: 8px 12px;
+    font-size: 10.5px;
+  }
+}
+
+/* ============================================
+   TOUCH OPTIMISATION
+   ============================================ */
+@media (hover: none) and (pointer: coarse) {
+  .sidebar-link,
+  .btn,
+  .btn-logout {
+    padding-top: 11px;
+    padding-bottom: 11px;
+  }
+
+  .sidebar-link {
+    margin: 2px 8px;
+    padding: 11px 16px;
+  }
+
+  .data-table tbody tr:hover {
+    background: inherit;
+  }
+}

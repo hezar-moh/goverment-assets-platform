@@ -113,12 +113,20 @@
 
 </aside>
 
+<!-- Sidebar overlay backdrop (mobile only) -->
+<div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
 <!-- Main wrap -->
 <div class="main-wrap">
 
   <!-- Topbar -->
-  <div class="topbar">
-    <div class="topbar-title">{% block page_heading %}{% endblock %}</div>
+  <div class="topbar" style="gap:4px;">
+    <div style="display:flex;align-items:center;gap:4px;min-width:0;">
+      <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle menu">
+        <i class="bi bi-list"></i>
+      </button>
+      <div class="topbar-title">{% block page_heading %}{% endblock %}</div>
+    </div>
     <div class="topbar-schema">
       <i class="bi bi-database" style="font-size:13px;"></i>
       {% if user.ministry_schema %}
@@ -155,6 +163,12 @@
 {% block auth_content %}{% endblock %}
 {% endif %}
 
+<script>
+function toggleSidebar() {
+  document.querySelector('.sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('show');
+}
+</script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>
