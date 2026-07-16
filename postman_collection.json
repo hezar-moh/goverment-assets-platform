@@ -1,0 +1,427 @@
+{
+  "info": {
+    "name": "GovAsset Platform API",
+    "description": "Integration tests for the Government Asset Management Platform API.\n\n## Prerequisites\n1. Import this collection into Postman\n2. Create an environment with:\n   - `base_url`: `https://goverment-assets-platform-production.up.railway.app` (or `http://localhost:8000` for local)\n   - `username`: `moh_admin`\n   - `password`: `Admin@123`\n\n## Test Flow\n1. Run \"Login\" first to get a JWT token\n2. Token auto-sets in `access_token` variable\n3. Run remaining tests in any order\n\n## Expected Results\n- All requests should return 200 or 201\n- Unauthenticated requests should return 401\n- Unauthorized role requests should return 403",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://goverment-assets-platform-production.up.railway.app"
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "asset_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "description": "Login, token refresh, profile, token verification, and logout.",
+      "item": [
+        {
+          "name": "1. Login (returns JWT tokens)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('access_token', jsonData.access);",
+                  "pm.test('Login successful', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(jsonData.access).to.not.be.empty;",
+                  "    pm.expect(jsonData.refresh).to.not.be.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login", ""]
+            }
+          }
+        },
+        {
+          "name": "2. Get My Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Profile returns user data', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.username).to.eql('moh_admin');",
+                  "    pm.expect(jsonData.role).to.eql('MINISTRY_ADMIN');",
+                  "    pm.expect(jsonData.ministry_schema).to.eql('moh_schema');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/me/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "me", ""]
+            }
+          }
+        },
+        {
+          "name": "3. Verify Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Token verification returns user info', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.valid).to.eql(true);",
+                  "    pm.expect(jsonData.role).to.not.be.empty;",
+                  "    pm.expect(jsonData.ministry_schema).to.not.be.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{access_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/verify-token/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "verify-token", ""]
+            }
+          }
+        },
+        {
+          "name": "4. Reject unauthenticated request (expect 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Unauthenticated request returns 401', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/auth/me/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "me", ""]
+            }
+          }
+        },
+        {
+          "name": "5. Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Token refresh works', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.access).to.not.be.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{access_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/refresh/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "refresh", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Assets",
+      "description": "CRUD operations on assets via the API.",
+      "item": [
+        {
+          "name": "6. List Assets",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Asset list returns results', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.count).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/assets/?page=1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "assets", ""],
+              "query": [
+                { "key": "page", "value": "1" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "7. Create Asset",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Asset created successfully', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.asset_number).to.not.be.empty;",
+                  "    pm.collectionVariables.set('asset_id', jsonData.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Asset from Postman\",\n  \"category_code\": \"ICT\",\n  \"status\": \"ACTIVE\",\n  \"condition\": \"GOOD\",\n  \"acquisition_cost\": 1000000.00,\n  \"asset_expiry_date\": \"2028-12-31\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/assets/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "assets", ""]
+            }
+          }
+        },
+        {
+          "name": "8. Get Asset Detail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Asset detail returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.name).to.not.be.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/assets/{{asset_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "assets", "{{asset_id}}", ""]
+            }
+          }
+        },
+        {
+          "name": "9. Update Asset",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Asset updated', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().status).to.eql('UNDER_MAINTENANCE');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"UNDER_MAINTENANCE\",\n  \"condition\": \"FAIR\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/assets/{{asset_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "assets", "{{asset_id}}", ""]
+            }
+          }
+        },
+        {
+          "name": "10. Delete Asset (expect fail for moh_admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Delete blocked — only SUPER_ADMIN/MINISTRY_ADMIN can delete', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([204, 403]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/assets/{{asset_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "assets", "{{asset_id}}", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Organisation & Dashboard",
+      "description": "Org units, audit logs, dashboard stats.",
+      "item": [
+        {
+          "name": "11. List Org Units",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Org units returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/org-units/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "org-units", ""]
+            }
+          }
+        },
+        {
+          "name": "12. View Audit Logs",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Audit logs returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.count).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/audit-logs/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "audit-logs", ""]
+            }
+          }
+        },
+        {
+          "name": "13. Dashboard Stats",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Dashboard stats returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.total_assets).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/dashboard/stats/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "dashboard", "stats", ""]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

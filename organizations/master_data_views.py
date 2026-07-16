@@ -2,6 +2,7 @@
 
 from django.shortcuts import render, redirect
 from django.contrib import messages
+from django.db.models import ProtectedError
 from django_tenants.utils import schema_context
 
 from authentication.decorators import login_required_custom, role_required
@@ -604,3 +605,53 @@ def asset_category_edit_view(request, category_id):
             "page_title": f"Edit: {category.name}",
         },
     )
+
+
+@login_required_custom
+@role_required("MINISTRY_ADMIN")
+def asset_category_delete_view(request, category_id):
+    """Delete an asset category. POST only. Fails if any assets use this category (PROTECT)."""
+    user = request.user
+
+    if request.method != "POST":
+        return redirect("asset_category_list")
+
+    try:
+        with schema_context(user.ministry_schema):
+            from assets.models import AssetCategory
+            from organizations.models import AuditLog
+
+            category = AssetCategory.objects.get(id=category_id)
+
+            AuditLog.objects.create(
+                performed_by_id=user.id,
+                performed_by_name=user.get_full_name() or user.username,
+                performed_by_role=user.role,
+                action="DELETE",
+                model_name="AssetCategory",
+                object_id=str(category.id),
+                object_repr=str(category),
+                old_value={
+                    "name": category.name,
+                    "code": category.code,
+                    "is_active": category.is_active,
+                },
+                new_value=None,
+                ip_address=_get_client_ip(request),
+                user_agent=request.META.get("HTTP_USER_AGENT", "")[:500],
+            )
+
+            category.delete()
+
+        messages.success(request, f"Category '{category.name}' deleted successfully.")
+
+    except ProtectedError:
+        messages.error(
+            request,
+            "Cannot delete one or more assets are assigned to this category. "
+            "Mark it as Inactive instead.",
+        )
+    except Exception:
+        messages.error(request, "Category not found.")
+
+    return redirect("asset_category_list")

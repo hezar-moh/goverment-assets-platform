@@ -47,6 +47,7 @@ from organizations.master_data_views import (
     asset_category_list_view,
     asset_category_create_view,
     asset_category_edit_view,
+    asset_category_delete_view,
 )
 from tenants.views import (
     ministry_list_view,
@@ -133,6 +134,7 @@ urlpatterns = [
     path('master-data/categories/',             asset_category_list_view,   name='asset_category_list'),
     path('master-data/categories/create/',      asset_category_create_view, name='asset_category_create'),
     path('master-data/categories/<int:category_id>/edit/', asset_category_edit_view, name='asset_category_edit'),
+    path('master-data/categories/<int:category_id>/delete/', asset_category_delete_view, name='asset_category_delete'),
 
     # Ministries
     path('ministries/',                        ministry_list_view,          name='ministry_list'),

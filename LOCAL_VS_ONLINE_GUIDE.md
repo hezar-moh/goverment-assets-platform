@@ -1874,7 +1874,7 @@ Railway Internal Network:
 |--------|-----------|------------|
 | **pgAdmin** | A desktop app with a graphical interface (point-and-click) | Install pgAdmin, enter the database credentials, see tables, run queries visually |
 | **psql** | A command-line tool (text only) | Open terminal, type `psql -h host -U user -d database`, type SQL queries |
-| **Railway Dashboard** | Web-based database viewer built into Railway | Go to Railway → PostgreSQL service → "Connect" tab → see data, run queries in browser |
+| **Railway Dashboard** | Web-based database viewer built into Railway | Go to Railway → PostgreSQL service → "Data" tab (or "Database" tab) → see data, run queries in browser |
 
 **Is pgAdmin still needed?**
 
@@ -1882,37 +1882,142 @@ Railway Internal Network:
 |-----------|---------------------|
 | You want to see tables, run SQL queries visually | **Yes** — pgAdmin is the easiest way |
 | You want to see how many schemas exist | **Yes** — pgAdmin shows schemas in a tree view |
-| You just want to check if data exists | **No** — Railway Dashboard is enough |
+| You just want to check if data exists | **No** — Railway Dashboard has a "Data" tab for basic viewing |
 | You want to backup or export data | **Yes** — pgAdmin has backup wizard |
 
-**How to connect pgAdmin to Railway PostgreSQL:**
+---
 
-1. Go to Railway Dashboard → Your PostgreSQL service
-2. Click "Connect" tab → Copy the connection string:
-   ```
-   postgresql://postgres:abc123@hostname.railway.app:5432/railway
-   ```
-3. Open pgAdmin → Right-click "Servers" → "Register" → "Server"
-4. Fill in:
-   - **Name:** Railway PostgreSQL (anything)
-   - **Host:** `hostname.railway.app` (the host from the URL)
-   - **Port:** `5432`
-   - **Username:** `postgres`
-   - **Password:** `abc123` (the password from the URL)
-5. Click "Save" → you can now browse tables, run queries, see schemas
+#### How to Connect pgAdmin to Railway PostgreSQL
 
-**To see how many schemas exist (for django-tenants):**
-```sql
-SELECT schema_name FROM information_schema.schemata;
+**Step 1: Find your Railway PostgreSQL connection info**
+
+Go to Railway Dashboard → Your PostgreSQL service → Look at the Variables tab. Find these values:
+
+| Variable | What it is | How to read it |
+|----------|-----------|---------------|
+| `PGHOST` | The server address | Click `*******` to reveal |
+| `PGPORT` | The internal port (5432) — NOT used from outside | Usually `5432` |
+| `PGUSER` | The database username | Click `*******` to reveal |
+| `PGPASSWORD` | The database password | Click `*******` to reveal |
+| `PGDATABASE` | The database name | Click `*******` to reveal (usually `railway`) |
+
+**Step 2: Also find your PUBLIC host and port**
+
+Look in the PostgreSQL service's **Networking** section (or "Connect" tab). You'll see something like:
 ```
-This will show:
-- `public` — shared tables (users, ministries, etc.)
-- `moh_schema` — Ministry of Health data
-- `mof_schema` — Ministry of Finance data
-- Any other ministry schemas you created
+tokaido.proxy.rlwy.net:30290 → :5432
+```
 
-**Why can't you "click and open" the PostgreSQL in deployment?**
-Because PostgreSQL is a **database server**, not a website. It doesn't have a web page you open in a browser. It only understands database connections on port 5432. That's why you need pgAdmin (a database client) to connect to it and browse its contents.
+This means:
+- **Public Host:** `tokaido.proxy.rlwy.net` (the address you use from your laptop)
+- **Public Port:** `30290` (the door number from outside)
+- **→ :5432** means "this public port 30290 forwards to internal PostgreSQL port 5432"
+
+**Why two ports?**
+```
+YOUR LAPTOP (pgAdmin)           RAILWAY INTERNAL
+┌─────────────┐                ┌──────────────────────┐
+│ Connect to  │                │  Django uses :5432   │
+│ :30290      │───────→────────│  Keycloak uses :5432 │
+│ (public)    │   forwards to  │  PostgreSQL really   │
+└─────────────┘                │  lives on :5432      │
+                               └──────────────────────┘
+```
+- **`:5432`** — PostgreSQL's real port, only accessible inside Railway's network (Django and Keycloak use this)
+- **`:30290`** — Railway's public proxy that forwards to :5432, so YOU can connect from your laptop
+
+**Step 3: Fill in pgAdmin**
+
+Open pgAdmin → Right-click "Servers" → "Register" → "Server". Fill these fields exactly:
+
+| Field | What it means | What to type |
+|-------|-------------|-------------|
+| **Name** | A label so you recognise this connection | `Railway PostgreSQL` (or anything) |
+| **Host name/address** | The server's address | `tokaido.proxy.rlwy.net` (from Networking section) |
+| **Port** | The connection door number | `30290` (from Networking section — this is the PUBLIC port) |
+| **Maintenance database** | A starting database to connect to first before pgAdmin shows you all databases | Leave blank, or type `railway` (from PGDATABASE) |
+| **Username** | Database user | Reveal PGUSER value in Variables tab, type it here |
+| **Password** | Database password | Reveal PGPASSWORD in Variables tab, copy/paste here |
+| **Save password?** | Check this so pgAdmin remembers for next time | Check it |
+| **Role** | A PostgreSQL role to assume after connecting | Leave blank |
+| **Service** | A predefined connection profile | Leave blank |
+
+**Step 4: Click Save**
+
+You'll now see all databases, schemas, and tables. Browse like you do locally.
+
+---
+
+#### pgAdmin Field Explanations (for the panel)
+
+| Field | Plain English explanation |
+|-------|-------------------------|
+| **Host** | The computer address where PostgreSQL lives |
+| **Port** | Which door number to knock on to reach PostgreSQL |
+| **Maintenance database** | pgAdmin needs to connect to SOMETHING first before it can show you a list of databases. This is that initial landing database. Like entering a building lobby before choosing which office to visit. |
+| **Username/Password** | Your ID card to prove you're allowed in |
+| **Save password?** | If checked, pgAdmin remembers it so you don't retype every time you open the program |
+| **Role** | A special permission level you can switch to after connecting (99% of people never use this) |
+| **Service** | A shortcut name for a group of connection settings stored in a file (advanced, ignore) |
+
+---
+
+#### All Railway PostgreSQL Variables Explained
+
+These are all the variables Railway automatically creates for your PostgreSQL service. You DON'T create these — Railway adds them when you add a PostgreSQL service.
+
+| Variable | What it is | Used by |
+|----------|-----------|---------|
+| `DATABASE_URL` | Full connection string for internal use: `postgresql://user:pass@host:5432/dbname` | Django (reads this in settings.py) |
+| `DATABASE_PUBLIC_URL` | Same as above but via the public proxy (tokaido) | External tools like pgAdmin can use this |
+| `PGHOST` | Internal hostname (like `containers-us-west-xxx.railway.app`) | Railway internal routing |
+| `PGPORT` | Internal port — always `5432` inside Railway | Django/Keycloak use this internally |
+| `PGUSER` | Database username (usually `postgres`) | Authentication |
+| `PGPASSWORD` | Database password (auto-generated, long random string) | Authentication |
+| `PGDATABASE` | Database name (usually `railway`) | Which database to connect to |
+| `POSTGRES_DB` | Same as PGDATABASE | Redundant, kept for compatibility |
+| `POSTGRES_USER` | Same as PGUSER | Redundant, kept for compatibility |
+| `POSTGRES_PASSWORD` | Same as PGPASSWORD | Redundant, kept for compatibility |
+| `PGDATA` | Internal path where PostgreSQL stores data files | PostgreSQL server config |
+| `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | Seconds Railway waits for active connections to finish before deploying | Deployment management |
+| `SSL_CERT_DAYS` | Days remaining on SSL certificate | Monitoring |
+
+**Which ones should YOU add to Django's Variables tab?** None of the above are for Django's Variables tab. These are automatically on the PostgreSQL service itself. For Django, you only add: `KEYCLOAK_SERVER_URL`, `KEYCLOAK_ADMIN_USERNAME`, `KEYCLOAK_ADMIN_PASSWORD`, `PLATFORM_BASE_URL`, and `ALLOWED_HOSTS`.
+
+---
+
+#### How to See How Many Schemas Exist
+
+**In pgAdmin:** Expand Server → Databases → railway → Schemas. You'll see `public`, `moh_schema`, `mof_schema`, etc.
+
+**Or run this SQL query** (in pgAdmin Query Tool or Railway Console):
+```sql
+SELECT schema_name FROM information_schema.schemata
+WHERE schema_name NOT IN ('information_schema', 'pg_catalog', 'pg_toast');
+```
+This shows only your application schemas.
+
+---
+
+#### Important: Changes are REAL-TIME
+
+- Add a user in Django admin → refresh pgAdmin → user appears immediately
+- Add data directly in pgAdmin → refresh your Django website → data appears immediately
+- It's the same database — Django, Keycloak, and pgAdmin all connect to the same PostgreSQL
+
+---
+
+#### Why Can't You Open the Database in a Browser?
+
+| System | What it does | How you access it |
+|--------|-------------|-------------------|
+| **Django** | Serves web pages | Browser: `https://your-app.up.railway.app` |
+| **Keycloak** | Handles authentication | Browser: `https://keycloak-xxx.up.railway.app` |
+| **PostgreSQL** | Stores data | **Only** via database tools: pgAdmin, psql, or code (Django ORM) |
+
+PostgreSQL doesn't speak HTTP (the language of websites). It speaks its own protocol on port 5432. That's why you need pgAdmin — it speaks PostgreSQL's language and shows you the data in a visual way.
+
+**Analogy:** Django is like a receptionist who answers phone calls (HTTP requests). PostgreSQL is like a filing cabinet in a locked room. Only the receptionist has the key. pgAdmin is like giving YOU a copy of the key so you can open the filing cabinet yourself.
 
 ---
 

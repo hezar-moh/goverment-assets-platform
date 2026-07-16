@@ -64,6 +64,16 @@
                  class="btn btn-outline btn-sm btn-icon" title="Edit">
                 <i class="bi bi-pencil"></i>
               </a>
+              <form method="POST"
+                    action="{% url 'asset_category_delete' cat.id %}"
+                    style="display:inline;"
+                    onsubmit="return confirm('Delete category \"{{ cat.name }}\"? This cannot be undone if no assets use it.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger-outline btn-sm btn-icon"
+                        title="Delete">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
             </div>
           </td>
         </tr>

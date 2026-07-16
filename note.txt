@@ -43,3 +43,28 @@ Use the appropriate command based on your situation.
 |---------|-------------|--------------|
 | `python manage.py setup_demo_data` | **First-time setup** or whenever you want to **reset the demo environment**. | Recreates Django demo users, demo assets, audit logs, **and** Keycloak users. |
 | `python manage.py sync_keycloak_attribu` | When **Keycloak users already exist** but are missing the `role` and `ministry_schema` attributes (for example, after the Railway deployment issue). | Updates existing Keycloak users by adding the missing `role` and `ministry_schema` attributes without recreating the users. |
+
+
+
+
+
+
+
+
+
+
+
+
+How to Delete Schemas (the "can't drop" error)
+You get cannot drop schema because other objects depend on it because there are tables inside. Do this:
+-- Run these in pgAdmin query tool or psql:
+
+-- Step 1: Drop all tables in the schema first
+DROP SCHEMA moh_schema CASCADE;
+
+-- CASCADE means "delete everything inside, including tables"
+Or from Django shell:
+python manage.py shell
+from tenants.models import Ministry
+m = Ministry.objects.get(schema_name='moh_schema')
+m.delete(force_drop=True)  # drops the schema and all its data
