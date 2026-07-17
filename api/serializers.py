@@ -1,11 +1,8 @@
-# Purpose: Serializers for JWT tokens, user profiles, assets, org units, and audit logs used by the API.
-
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """Adds role, ministry_schema, keycloak_id and full_name to the JWT token so Flutter gets everything in one call."""
 
     @classmethod
     def get_token(cls, user):
@@ -32,8 +29,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    """User profile for the /api/auth/me/ endpoint. Never exposes passwords."""
-
     full_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -48,7 +43,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 
 class AssetCategorySerializer(serializers.Serializer):
-    """Asset categories for dropdown menus. Uses Serializer (not ModelSerializer) because it lives in a tenant schema."""
     id = serializers.IntegerField(read_only=True)
     name = serializers.CharField()
     code = serializers.CharField()
@@ -57,7 +51,6 @@ class AssetCategorySerializer(serializers.Serializer):
 
 
 class AssetSerializer(serializers.Serializer):
-    """All asset fields the Flutter app needs, with computed expiry properties."""
     id = serializers.IntegerField(read_only=True)
     asset_number = serializers.CharField()
     name = serializers.CharField()
@@ -116,7 +109,6 @@ class AssetSerializer(serializers.Serializer):
 
 
 class OrgUnitSerializer(serializers.Serializer):
-    """Organisation unit for the org tree API."""
     id = serializers.IntegerField(read_only=True)
     name = serializers.CharField()
     code = serializers.CharField(allow_blank=True)
@@ -126,7 +118,6 @@ class OrgUnitSerializer(serializers.Serializer):
 
 
 class AuditLogSerializer(serializers.Serializer):
-    """Audit log entries for the API."""
     id = serializers.IntegerField(read_only=True)
     performed_by_id = serializers.IntegerField(allow_null=True)
     performed_by_name = serializers.CharField()

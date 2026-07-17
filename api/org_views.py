@@ -1,4 +1,3 @@
-"""REST API views for organisations, audit logs, and dashboard stats."""
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -6,20 +5,13 @@ from rest_framework.permissions import IsAuthenticated
 from django_tenants.utils import schema_context
 import logging
 
-from authentication.api_permissions import (
-    HasMinistrySchema,
-    CanViewAuditLogs,
-)
-from authentication.api_serializers import (
-    AuditLogSerializer,
-)
+from .permissions import HasMinistrySchema, CanViewAuditLogs
+from .serializers import AuditLogSerializer
 
 logger = logging.getLogger('authentication')
 
 
 class OrgUnitListAPIView(APIView):
-    """GET /api/org-units/ — Returns the full org hierarchy tree for the user's ministry, plus a flat facilities list for asset registration dropdowns."""
-
     permission_classes = [IsAuthenticated, HasMinistrySchema]
 
     def get(self, request):
@@ -89,7 +81,6 @@ class OrgUnitListAPIView(APIView):
                         ],
                     })
 
-                # Flat facilities list for Flutter asset registration dropdown
                 all_facilities = [
                     {
                         'id':        u.id,
@@ -125,8 +116,6 @@ class OrgUnitListAPIView(APIView):
 
 
 class AuditLogListAPIView(APIView):
-    """GET /api/audit-logs/ — Paginated audit logs for the user's ministry. Supports ?action=, ?model=, and ?page= filters."""
-
     permission_classes = [
         IsAuthenticated,
         HasMinistrySchema,
@@ -196,8 +185,6 @@ class AuditLogListAPIView(APIView):
 
 
 class DashboardStatsAPIView(APIView):
-    """GET /api/dashboard/stats/ — Dashboard statistics for Flutter mobile app (total assets, expiry warnings, recent audit activity)."""
-
     permission_classes = [IsAuthenticated, HasMinistrySchema]
 
     def get(self, request):
@@ -271,7 +258,7 @@ class DashboardStatsAPIView(APIView):
                 expiring_soon   = []
                 expiring_later  = []
 
-                from authentication.api_serializers import AssetSerializer
+                from .serializers import AssetSerializer
                 for asset in expirable:
                     days_left = (
                         asset.asset_expiry_date - today

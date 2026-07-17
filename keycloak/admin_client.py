@@ -1,5 +1,3 @@
-# Purpose: Talks to the Keycloak Admin REST API — create, update, delete users, reset passwords.
-
 import requests
 import logging
 
@@ -7,7 +5,6 @@ logger = logging.getLogger('authentication')
 
 
 class KeycloakAdminService:
-    """Manages users in Keycloak via the Admin API. Gets a fresh admin token for each operation."""
 
     def __init__(self):
         from django.conf import settings
@@ -19,7 +16,6 @@ class KeycloakAdminService:
         self.admin_password = getattr(settings, 'KEYCLOAK_ADMIN_PASSWORD', 'admin123')
 
     def _get_admin_token(self):
-        """Get a short-lived admin token from the Keycloak master realm."""
         token_url = f"{self.server_url}/realms/master/protocol/openid-connect/token"
 
         response = requests.post(
@@ -46,7 +42,6 @@ class KeycloakAdminService:
         return response.json()['access_token']
 
     def _get_headers(self):
-        """Build headers with a fresh admin token."""
         token = self._get_admin_token()
         return {
             'Authorization': f'Bearer {token}',
@@ -54,7 +49,6 @@ class KeycloakAdminService:
         }
 
     def create_user(self, username, email, first_name, last_name, password, role, ministry_schema):
-        """Create a user in Keycloak (creates user, then sets password in a separate call). Returns the keycloak_id UUID."""
         headers  = self._get_headers()
         base_url = f"{self.server_url}/admin/realms/{self.realm}"
 
@@ -87,12 +81,10 @@ class KeycloakAdminService:
                 f"Response: {create_response.text}"
             )
 
-        # Keycloak returns the new user's UUID in the Location header
         location = create_response.headers.get('Location', '')
         keycloak_id = location.split('/')[-1]
 
         if not keycloak_id:
-            # If Location header missing, search by username
             keycloak_id = self.get_user_id(username)
 
         if not keycloak_id:
@@ -113,7 +105,7 @@ class KeycloakAdminService:
         )
 
         if password_response.status_code not in [204, 200]:
-            self.delete_user(keycloak_id)  # rollback: don't leave a user without a password
+            self.delete_user(keycloak_id)
             raise Exception(
                 f"Failed to set password for '{username}' in Keycloak. "
                 f"Status: {password_response.status_code}"
@@ -126,7 +118,6 @@ class KeycloakAdminService:
         return keycloak_id
 
     def get_user_id(self, username):
-        """Find a user in Keycloak by username and return their UUID."""
         headers = self._get_headers()
         base_url = f"{self.server_url}/admin/realms/{self.realm}"
 
@@ -145,7 +136,6 @@ class KeycloakAdminService:
         return None
 
     def delete_user(self, keycloak_id):
-        """Delete a user from Keycloak by UUID. Used for rollback if Django user creation fails."""
         try:
             headers  = self._get_headers()
             base_url = f"{self.server_url}/admin/realms/{self.realm}"
@@ -161,7 +151,6 @@ class KeycloakAdminService:
 
     def update_user(self, keycloak_id, email=None, first_name=None, last_name=None,
                     role=None, ministry_schema=None, is_active=None):
-        """Update a Keycloak user. Only changes fields that are provided (not None)."""
         headers = self._get_headers()
         base_url = f"{self.server_url}/admin/realms/{self.realm}"
 
@@ -185,7 +174,6 @@ class KeycloakAdminService:
         logger.info(f"Keycloak: Updated user {keycloak_id}")
 
     def get_user(self, keycloak_id):
-        """Fetch a single user from Keycloak. Returns dict with 'enabled', 'email', etc. or None."""
         headers = self._get_headers()
         url = f"{self.server_url}/admin/realms/{self.realm}/users/{keycloak_id}"
         response = requests.get(url, headers=headers, timeout=10)
@@ -195,7 +183,6 @@ class KeycloakAdminService:
         return None
 
     def list_users_page(self, first=0, max=100):
-        """Fetch one page of users from Keycloak. Returns list of user dicts."""
         headers = self._get_headers()
         url = f"{self.server_url}/admin/realms/{self.realm}/users?first={first}&max={max}"
         response = requests.get(url, headers=headers, timeout=10)
@@ -205,7 +192,6 @@ class KeycloakAdminService:
         return []
 
     def get_all_users(self):
-        """Fetch ALL users from Keycloak (handles pagination automatically)."""
         all_users = []
         first = 0
         page_size = 100
@@ -220,11 +206,6 @@ class KeycloakAdminService:
         return all_users
 
     def ensure_custom_attributes_defined(self):
-        """Declare role + ministry_schema in the realm's user profile (Keycloak 26+).
-
-        Keycloak 26+ silently drops undeclared attributes.  Call this once before
-        any create/update that sets custom attributes.
-        """
         headers  = self._get_headers()
         url = f"{self.server_url}/admin/realms/{self.realm}/users/profile"
 
@@ -259,7 +240,7 @@ class KeycloakAdminService:
             })
 
         if not to_add:
-            return  # already defined
+            return
 
         profile['attributes'] = profile.get('attributes', []) + to_add
         put_resp = requests.put(url, json=profile, headers=headers, timeout=10)
@@ -275,7 +256,6 @@ class KeycloakAdminService:
             )
 
     def reset_password(self, keycloak_id, new_password):
-        """Reset a user's password in Keycloak."""
         headers  = self._get_headers()
         base_url = f"{self.server_url}/admin/realms/{self.realm}"
 

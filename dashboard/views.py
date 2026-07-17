@@ -1,16 +1,9 @@
-# Purpose: Dashboard view — shows platform-wide stats for Super Admin or ministry-level stats with expiry warnings.
-
 from django.shortcuts import render
 from django_tenants.utils import schema_context
 from django.utils import timezone
 
-from .decorators import login_required_custom, ministry_isolation_check
 
-
-@login_required_custom
-@ministry_isolation_check
 def dashboard_view(request):
-    """Main dashboard. Super Admin sees platform-wide stats; others see their ministry stats with expiry warnings."""
     user = request.user
     context = {
         "user": user,
@@ -27,7 +20,6 @@ def dashboard_view(request):
 
 
 def _get_super_admin_stats():
-    """Count ministries, users, and assets across all schemas for the Super Admin dashboard."""
     from tenants.models import Ministry
     from authentication.models import CustomUser
 
@@ -35,7 +27,6 @@ def _get_super_admin_stats():
         total_ministries = Ministry.objects.exclude(schema_name="public").count()
         total_users = CustomUser.objects.count()
 
-        # Count assets across ALL ministry schemas
         total_assets = 0
         active_assets = 0
         ministries = Ministry.objects.exclude(schema_name="public")
@@ -69,7 +60,6 @@ def _get_super_admin_stats():
 
 
 def _get_ministry_stats(schema_name):
-    """Ministry dashboard stats: asset counts, expiry warnings grouped by urgency (expired / 30 days / 90 days), recent audit."""
     from assets.models import Asset
     from organizations.models import AuditLog
 
@@ -90,9 +80,9 @@ def _get_ministry_stats(schema_name):
                 .order_by("asset_expiry_date")
             )
 
-            expired_assets = []  # Already past expiry date
-            expiring_soon = []  # Expires within 30 days
-            expiring_later = []  # Expires within 31–90 days
+            expired_assets = []
+            expiring_soon = []
+            expiring_later = []
 
             for asset in expirable:
                 days_left = (asset.asset_expiry_date - today).days
@@ -103,7 +93,6 @@ def _get_ministry_stats(schema_name):
                 elif days_left <= 90:
                     expiring_later.append(asset)
 
-            # ── Recent audit activity ─────────────────────────────────────────
             recent_audit = list(
                 AuditLog.objects.order_by("-timestamp")[:5].values(
                     "action",

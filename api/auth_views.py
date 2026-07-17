@@ -1,5 +1,3 @@
-# Purpose: API endpoints for mobile app authentication — login, refresh, profile, verify token, and logout.
-
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -10,20 +8,12 @@ from rest_framework_simplejwt.exceptions import TokenError
 from django_tenants.utils import schema_context
 import logging
 
-from .api_serializers import CustomTokenObtainPairSerializer, UserProfileSerializer
+from .serializers import CustomTokenObtainPairSerializer, UserProfileSerializer
 
 logger = logging.getLogger('authentication')
 
 
 class LoginAPIView(TokenObtainPairView):
-    """POST /api/auth/login/ — 3-stage progressive brute force protection.
-
-    Stage 1 (attempts 1-3): WARNING — error message + remaining count
-    Stage 2 (attempts 4-5): COOLDOWN — 5-minute lock, warns next = disable
-    Stage 3 (attempts 6+):  DISABLED — account permanently locked,
-                            unlock email sent to registered email,
-                            admin can also unlock from User Management
-    """
     serializer_class  = CustomTokenObtainPairSerializer
     permission_classes = [AllowAny]
 
@@ -33,7 +23,6 @@ class LoginAPIView(TokenObtainPairView):
         from django.conf import settings as django_settings
         max_warnings  = getattr(django_settings, 'LOGIN_MAX_WARNINGS',     3)
 
-        # ── Check 1: Is account permanently locked? ─────────────────────────
         try:
             from authentication.models import CustomUser
             user_obj = CustomUser.objects.get(username=username)
@@ -57,13 +46,11 @@ class LoginAPIView(TokenObtainPairView):
         except CustomUser.DoesNotExist:
             pass
 
-        # ── Check 2: Is this IP in temporary cooldown? ──────────────────────
         from authentication.models import LoginAttempt
         cooldown_resp = self._check_cooldown(username, ip_address)
         if cooldown_resp:
             return cooldown_resp
 
-        # ── Attempt authentication ──────────────────────────────────────────
         serializer = self.get_serializer(data=request.data)
 
         try:
@@ -72,13 +59,11 @@ class LoginAPIView(TokenObtainPairView):
             result = self._handle_failed_attempt(username, ip_address, request)
             return result
 
-        # ── Success: clear all locks and reset ──────────────────────────────
         self._clear_failed_attempts(username, ip_address)
 
         user = serializer.user
         logger.info(f"API Login success: {username} from {ip_address}")
 
-        # Record login in audit trail
         if user.ministry_schema:
             try:
                 from organizations.models import AuditLog
@@ -106,7 +91,6 @@ class LoginAPIView(TokenObtainPairView):
         )
 
     def _check_cooldown(self, username, ip_address):
-        """Return a 429 Response if in cooldown, else None."""
         from authentication.models import LoginAttempt
         try:
             attempt = LoginAttempt.objects.get(
@@ -134,7 +118,6 @@ class LoginAPIView(TokenObtainPairView):
         return None
 
     def _handle_failed_attempt(self, username, ip_address, request):
-        """3-stage progressive lockout logic. Returns the error Response."""
         from authentication.models import LoginAttempt, CustomUser
         from django.utils import timezone
         from datetime import timedelta
@@ -150,7 +133,6 @@ class LoginAPIView(TokenObtainPairView):
             defaults={'attempts': 0, 'stage': LoginAttempt.STAGE_WARNING},
         )
 
-        # If cooldown has expired, we keep counting (don't reset)
         if (attempt.locked_until
                 and timezone.now() >= attempt.locked_until):
             attempt.locked_until = None
@@ -163,7 +145,6 @@ class LoginAPIView(TokenObtainPairView):
             f"— attempt {attempt.attempts}"
         )
 
-        # ── Stage 3: Account permanently disabled ──────────────────────────
         if attempt.attempts > max_attempts:
             self._disable_account(username, ip_address, request, attempt)
             return Response({
@@ -179,7 +160,6 @@ class LoginAPIView(TokenObtainPairView):
                 'status': 403,
             }, status=status.HTTP_403_FORBIDDEN)
 
-        # ── Stage 2: Temporary cooldown ────────────────────────────────────
         if attempt.attempts > max_warnings:
             attempt.stage          = LoginAttempt.STAGE_COOLDOWN
             attempt.locked_until = (
@@ -202,7 +182,6 @@ class LoginAPIView(TokenObtainPairView):
                 'status': 429,
             }, status=status.HTTP_429_TOO_MANY_REQUESTS)
 
-        # ── Stage 1: Warning only ──────────────────────────────────────────
         remaining = max_attempts - attempt.attempts
         return Response({
             'error': True,
@@ -217,7 +196,6 @@ class LoginAPIView(TokenObtainPairView):
         }, status=status.HTTP_401_UNAUTHORIZED)
 
     def _disable_account(self, username, ip_address, request, attempt):
-        """Permanently lock the user account, send unlock email, write audit log."""
         from authentication.models import CustomUser, UnlockToken
 
         attempt.stage = LoginAttempt.STAGE_DISABLED
@@ -233,7 +211,6 @@ class LoginAPIView(TokenObtainPairView):
                 f"after {attempt.attempts} failed attempts from {ip_address}"
             )
 
-            # ── Write audit log ──────────────────────────────────────────
             if user.ministry_schema:
                 try:
                     from organizations.models import AuditLog
@@ -256,7 +233,6 @@ class LoginAPIView(TokenObtainPairView):
                 except Exception:
                     pass
 
-            # ── Send unlock email ────────────────────────────────────────
             if user.email:
                 self._send_unlock_email(user, ip_address)
             else:
@@ -271,7 +247,6 @@ class LoginAPIView(TokenObtainPairView):
             )
 
     def _send_unlock_email(self, user, ip_address):
-        """Generate an unlock token and email it to the user."""
         from authentication.models import UnlockToken
         from django.core.mail import send_mail
         from django.conf import settings as django_settings
@@ -322,7 +297,6 @@ class LoginAPIView(TokenObtainPairView):
             )
 
     def _clear_failed_attempts(self, username, ip_address):
-        """Clear all locks on successful login."""
         from authentication.models import LoginAttempt, CustomUser
         LoginAttempt.objects.filter(
             username=username,
@@ -344,7 +318,6 @@ class LoginAPIView(TokenObtainPairView):
 
 
 class RefreshTokenAPIView(APIView):
-    """POST /api/auth/refresh/ — exchange a refresh token for a new access token."""
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -360,9 +333,6 @@ class RefreshTokenAPIView(APIView):
 
         try:
             token = RefreshToken(refresh_token)
-
-            # This creates a new access token AND a new refresh token
-            # The old refresh token is blacklisted (cannot be used again)
             new_access  = str(token.access_token)
             new_refresh = str(token)
 
@@ -381,7 +351,6 @@ class RefreshTokenAPIView(APIView):
 
 
 class MeAPIView(APIView):
-    """GET /api/auth/me/ — return the profile of the currently authenticated user."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -390,13 +359,10 @@ class MeAPIView(APIView):
 
 
 class VerifyTokenAPIView(APIView):
-    """GET /api/auth/verify-token/ — other groups call this to validate a token and get user role and ministry."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
-
-        # Get ministry name for other groups
         ministry_name = ''
         if user.ministry_schema:
             try:
@@ -424,7 +390,6 @@ class VerifyTokenAPIView(APIView):
 
 
 class LogoutAPIView(APIView):
-    """POST /api/auth/logout/ — blacklist the refresh token so it cannot be used again."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -440,7 +405,6 @@ class LogoutAPIView(APIView):
 
         try:
             token = RefreshToken(refresh_token)
-            # Blacklist this token — it can never be used again
             token.blacklist()
 
             user = request.user
@@ -449,7 +413,6 @@ class LogoutAPIView(APIView):
                 f"{request.META.get('REMOTE_ADDR', '')}"
             )
 
-            # Record logout in audit trail
             if user.ministry_schema:
                 try:
                     from organizations.models import AuditLog

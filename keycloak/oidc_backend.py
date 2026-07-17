@@ -1,5 +1,3 @@
-# Purpose: Connects Keycloak SSO login to Django user accounts. Called by mozilla-django-oidc on every SSO login attempt.
-
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 import logging
 
@@ -7,15 +5,8 @@ logger = logging.getLogger('authentication')
 
 
 class GovAssetOIDCBackend(OIDCAuthenticationBackend):
-    """Bridge between Keycloak authentication and Django user accounts."""
 
     def filter_users_by_claims(self, claims):
-        """Find a Django user matching the Keycloak token.
-
-        Returns the user queryset so mozilla_django_oidc can call update_user().
-        Actual blocking is done in get_user() which also checks is_locked.
-        Session flags are set here so login_view() can show the right message.
-        """
         from authentication.models import CustomUser
 
         logger.info(f"OIDC claims received: {claims}")
@@ -39,10 +30,9 @@ class GovAssetOIDCBackend(OIDCAuthenticationBackend):
                     logger.info(f"OIDC: Linked {username} to {keycloak_id}")
 
         if user:
-            # Sync is_active status FROM Keycloak (in case admin disabled user in Keycloak)
             if user.keycloak_id:
                 try:
-                    from authentication.keycloak_admin import KeycloakAdminService
+                    from .admin_client import KeycloakAdminService
                     kc = KeycloakAdminService()
                     kc_user = kc.get_user(user.keycloak_id)
                     if kc_user is not None:
@@ -57,9 +47,6 @@ class GovAssetOIDCBackend(OIDCAuthenticationBackend):
                 except Exception as e:
                     logger.warning(f"OIDC: Failed to sync status from Keycloak: {e}")
 
-            # Set session flags so login_view can show the right message.
-            # Actual blocking happens in get_user() below — we still return
-            # the user queryset so update_user() runs, keeping data in sync.
             if user.is_locked:
                 if self.request is not None:
                     self.request.session['account_locked_notice'] = True
@@ -76,12 +63,6 @@ class GovAssetOIDCBackend(OIDCAuthenticationBackend):
         return CustomUser.objects.none()
 
     def get_user(self, user_id):
-        """Override to also block locked accounts (is_locked=True).
-
-        The parent get_user() only checks is_active=True.
-        We add the is_locked=False check so brute-force-locked users
-        are blocked at the OIDC level too.
-        """
         from authentication.models import CustomUser
         try:
             return CustomUser.objects.get(
@@ -91,7 +72,6 @@ class GovAssetOIDCBackend(OIDCAuthenticationBackend):
             return None
 
     def create_user(self, claims):
-        """Block auto-creation and record in PendingAccess instead. Returns None to deny login."""
         username = claims.get('preferred_username', '')
         email = claims.get('email', '')
         full_name = claims.get('name', '')
@@ -128,7 +108,6 @@ class GovAssetOIDCBackend(OIDCAuthenticationBackend):
         return None
 
     def update_user(self, user, claims):
-        """Update the user's role and ministry_schema from Keycloak attributes on each login."""
         keycloak_id = claims.get('sub', '')
         ministry_schema = claims.get('ministry_schema', '')
         role = claims.get('role', '')
@@ -154,5 +133,4 @@ class GovAssetOIDCBackend(OIDCAuthenticationBackend):
         return user
 
     def get_userinfo(self, access_token, id_token, payload):
-        """Get user info from the token payload."""
         return super().get_userinfo(access_token, id_token, payload)

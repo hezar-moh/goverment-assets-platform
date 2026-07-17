@@ -196,7 +196,7 @@ class PermissionClassesTest(TestCase):
     """Verify that DRF permission classes correctly block or allow access."""
 
     def setUp(self):
-        from authentication.api_permissions import (
+        from api.permissions import (
             IsSuperAdmin, IsMinistryAdmin, IsAgencyManagerOrAbove,
             CanManageAssets, CanDeleteAssets, CanViewAuditLogs, HasMinistrySchema,
         )

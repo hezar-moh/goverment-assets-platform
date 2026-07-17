@@ -1,5 +1,3 @@
-# Purpose: API endpoints for the mobile app to list, create, update, and delete assets.
-
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -7,18 +5,13 @@ from rest_framework.permissions import IsAuthenticated
 from django_tenants.utils import schema_context
 import logging
 
-from authentication.api_permissions import (
-    CanManageAssets, CanDeleteAssets, HasMinistrySchema,
-)
-from authentication.api_serializers import (
-    AssetSerializer, AssetCategorySerializer,
-)
+from .permissions import CanManageAssets, CanDeleteAssets, HasMinistrySchema
+from .serializers import AssetSerializer, AssetCategorySerializer
 
 logger = logging.getLogger('authentication')
 
 
 def _get_client_ip(request):
-    """Get the real client IP — checks proxy forwarding headers first."""
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
     if x_forwarded_for:
         return x_forwarded_for.split(',')[0].strip()
@@ -26,7 +19,6 @@ def _get_client_ip(request):
 
 
 class AssetListCreateAPIView(APIView):
-    """GET /api/assets/ — list all assets | POST /api/assets/ — create a new asset."""
     permission_classes = [
         IsAuthenticated,
         HasMinistrySchema,
@@ -34,10 +26,8 @@ class AssetListCreateAPIView(APIView):
     ]
 
     def get(self, request):
-        """Return all assets for the logged-in user's ministry, with filtering and pagination."""
         user = request.user
 
-        # Super Admin does not belong to one ministry
         if user.role == 'SUPER_ADMIN':
             return Response({
                 'count':    0,
@@ -57,13 +47,10 @@ class AssetListCreateAPIView(APIView):
             with schema_context(user.ministry_schema):
                 from assets.models import Asset, AssetCategory
 
-                # Start with all assets
                 qs = Asset.objects.select_related('category').all()
 
-                # Apply filters from query parameters
                 search = request.GET.get('search', '').strip()
                 if search:
-                    # Filter by name OR asset number
                     qs = qs.filter(name__icontains=search) | \
                          qs.filter(asset_number__icontains=search)
 
@@ -81,9 +68,6 @@ class AssetListCreateAPIView(APIView):
 
                 total = qs.count()
 
-                # Manual pagination
-                # We do this manually because automatic DRF pagination
-                # does not work well with schema_context
                 page_size = 20
                 try:
                     page = int(request.GET.get('page', 1))
@@ -105,7 +89,6 @@ class AssetListCreateAPIView(APIView):
                 'status':  500,
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # Serialize the assets
         serializer  = AssetSerializer(assets, many=True)
         total_pages = (total + page_size - 1) // page_size
 
@@ -130,9 +113,6 @@ class AssetListCreateAPIView(APIView):
         })
 
     def post(self, request):
-        """Create a new asset in the user's ministry schema.
-        asset_number is optional — auto-generated if not provided.
-        """
         user = request.user
 
         if user.role == 'AUDITOR':
@@ -145,7 +125,6 @@ class AssetListCreateAPIView(APIView):
 
         data = request.data
 
-        # Validate required fields
         errors = {}
         if not data.get('name', '').strip():
             errors['name'] = 'Asset name is required.'
@@ -166,7 +145,6 @@ class AssetListCreateAPIView(APIView):
                 from assets.models import Asset, AssetCategory
                 from assets.views import generate_asset_number
 
-                # Verify category exists
                 try:
                     category = AssetCategory.objects.get(
                         id=data.get('category_id')
@@ -179,7 +157,6 @@ class AssetListCreateAPIView(APIView):
                         'status':  404,
                     }, status=status.HTTP_404_NOT_FOUND)
 
-                # Auto-generate asset number if not provided
                 asset_number = data.get('asset_number', '').strip()
                 if not asset_number:
                     asset_number = generate_asset_number(
@@ -187,7 +164,6 @@ class AssetListCreateAPIView(APIView):
                         category.code
                     )
 
-                # Check uniqueness
                 if Asset.objects.filter(
                     asset_number=asset_number
                 ).exists():
@@ -200,7 +176,6 @@ class AssetListCreateAPIView(APIView):
                         'status':  400,
                     }, status=status.HTTP_400_BAD_REQUEST)
 
-                # Resolve org unit name snapshot
                 org_unit_id   = data.get('org_unit_id')
                 org_unit_name = ''
                 if org_unit_id:
@@ -211,7 +186,6 @@ class AssetListCreateAPIView(APIView):
                     except OrgUnit.DoesNotExist:
                         org_unit_id = None
 
-                # Create the asset
                 asset = Asset.objects.create(
                     asset_number=asset_number,
                     name=data.get('name', '').strip(),
@@ -247,7 +221,6 @@ class AssetListCreateAPIView(APIView):
                     ),
                 )
 
-                # Write audit log
                 from organizations.models import AuditLog
                 AuditLog.objects.create(
                     performed_by_id=user.id,
@@ -287,7 +260,6 @@ class AssetListCreateAPIView(APIView):
 
 
 class AssetDetailAPIView(APIView):
-    """GET /api/assets/{id}/ — view | PUT — update | DELETE — delete a single asset."""
     permission_classes = [
         IsAuthenticated,
         HasMinistrySchema,
@@ -296,7 +268,6 @@ class AssetDetailAPIView(APIView):
     ]
 
     def _get_asset(self, asset_id, ministry_schema):
-        """Fetch one asset. Returns (asset, None) or (None, error_response)."""
         from assets.models import Asset
         try:
             with schema_context(ministry_schema):
@@ -320,7 +291,6 @@ class AssetDetailAPIView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def get(self, request, asset_id):
-        """Return full details of a single asset."""
         user = request.user
 
         if user.role == 'SUPER_ADMIN':
@@ -339,7 +309,6 @@ class AssetDetailAPIView(APIView):
         return Response(serializer.data)
 
     def put(self, request, asset_id):
-        """Update an existing asset. Records old and new values in the audit log."""
         user = request.user
 
         if user.role in ['AUDITOR', 'SUPER_ADMIN']:
@@ -367,7 +336,6 @@ class AssetDetailAPIView(APIView):
                         'status':  404,
                     }, status=status.HTTP_404_NOT_FOUND)
 
-                # Capture old values for audit
                 old_value = {
                     'name':      asset.name,
                     'status':    asset.status,
@@ -376,7 +344,6 @@ class AssetDetailAPIView(APIView):
 
                 data = request.data
 
-                # Update only fields that are provided
                 if 'name' in data:
                     asset.name = data['name'].strip()
                 if 'status' in data:
@@ -420,7 +387,6 @@ class AssetDetailAPIView(APIView):
                 if 'disposal_notes' in data:
                     asset.disposal_notes = data['disposal_notes']
 
-                # Update category if provided
                 if 'category_id' in data:
                     try:
                         asset.category = AssetCategory.objects.get(
@@ -436,7 +402,6 @@ class AssetDetailAPIView(APIView):
 
                 asset.save()
 
-                # Write audit log
                 AuditLog.objects.create(
                     performed_by_id=user.id,
                     performed_by_name=(
@@ -471,7 +436,6 @@ class AssetDetailAPIView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def delete(self, request, asset_id):
-        """Delete an asset permanently. Only Ministry Admin and Super Admin can do this."""
         user = request.user
 
         if user.role not in ['MINISTRY_ADMIN', 'SUPER_ADMIN']:
@@ -499,7 +463,6 @@ class AssetDetailAPIView(APIView):
                         'status':  404,
                     }, status=status.HTTP_404_NOT_FOUND)
 
-                # Write audit log BEFORE deleting
                 AuditLog.objects.create(
                     performed_by_id=user.id,
                     performed_by_name=(
@@ -541,7 +504,6 @@ class AssetDetailAPIView(APIView):
 
 
 class AssetCategoryListAPIView(APIView):
-    """GET /api/assets/categories/ — returns active categories for dropdown menus."""
     permission_classes = [IsAuthenticated, HasMinistrySchema]
 
     def get(self, request):

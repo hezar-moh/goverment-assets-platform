@@ -476,8 +476,8 @@ CLIENT receives response, displays data
 | `templates/shared/pagination.html` | Page number buttons |
 | `templates/dashboard/dashboard.html` | Dashboard page |
 | `templates/authentication/*.html` | Login, user management pages |
-| `templates/assets/*.html` | Asset list, form, detail pages |
-| `templates/organizations/*.html` | Org unit, master data, audit log, asset category pages |
+| `templates/assets/*.html` | Asset list, form, detail, and asset category pages |
+| `templates/organizations/*.html` | Org unit, master data, audit log pages |
 | `templates/tenants/*.html` | Ministry management pages |
 | `static/css/style.css` | ALL CSS — including responsive rules |
 

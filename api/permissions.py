@@ -1,10 +1,7 @@
-# Purpose: DRF permission classes that control who can access each API endpoint.
-
 from rest_framework.permissions import BasePermission
 
 
 class IsSuperAdmin(BasePermission):
-    """Only SUPER_ADMIN role."""
     message = "Only Super Admin can access this endpoint."
 
     def has_permission(self, request, view):
@@ -12,7 +9,6 @@ class IsSuperAdmin(BasePermission):
 
 
 class IsMinistryAdmin(BasePermission):
-    """MINISTRY_ADMIN and above."""
     message = "Ministry Admin or above required."
 
     def has_permission(self, request, view):
@@ -20,7 +16,6 @@ class IsMinistryAdmin(BasePermission):
 
 
 class IsAgencyManagerOrAbove(BasePermission):
-    """AGENCY_MANAGER and above."""
     message = "Agency Manager or above required."
 
     def has_permission(self, request, view):
@@ -28,7 +23,6 @@ class IsAgencyManagerOrAbove(BasePermission):
 
 
 class CanManageAssets(BasePermission):
-    """Allows asset write access. Auditors are read-only."""
     message = "You do not have permission to manage assets."
 
     def has_permission(self, request, view):
@@ -40,7 +34,6 @@ class CanManageAssets(BasePermission):
 
 
 class CanDeleteAssets(BasePermission):
-    """Only MINISTRY_ADMIN and SUPER_ADMIN can DELETE."""
     message = "Only Ministry Admin can delete assets."
 
     def has_permission(self, request, view):
@@ -52,7 +45,6 @@ class CanDeleteAssets(BasePermission):
 
 
 class CanViewAuditLogs(BasePermission):
-    """AUDITOR, MINISTRY_ADMIN, and SUPER_ADMIN can view audit logs."""
     message = "Auditor or above required to view audit logs."
 
     def has_permission(self, request, view):
@@ -60,7 +52,6 @@ class CanViewAuditLogs(BasePermission):
 
 
 class HasMinistrySchema(BasePermission):
-    """Block users without a ministry_schema. SUPER_ADMIN is exempt."""
     message = "Your account is not assigned to any ministry. Contact your administrator."
 
     def has_permission(self, request, view):

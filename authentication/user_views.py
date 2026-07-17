@@ -27,7 +27,7 @@ def user_list_view(request):
     # Fetch ALL Keycloak users in one batch, build a dict by keycloak_id,
     # then update any Django users whose is_active doesn't match.
     try:
-        from authentication.keycloak_admin import KeycloakAdminService
+        from keycloak.admin_client import KeycloakAdminService
         kc = KeycloakAdminService()
         all_kc_users = kc.get_all_users()
         kc_status = {
@@ -125,7 +125,7 @@ def user_create_view(request):
 
         keycloak_id = None
         try:
-            from authentication.keycloak_admin import KeycloakAdminService
+            from keycloak.admin_client import KeycloakAdminService
             kc = KeycloakAdminService()
             keycloak_id = kc.create_user(
                 username=username,
@@ -170,7 +170,7 @@ def user_create_view(request):
         except Exception as e:
             if keycloak_id:
                 try:
-                    from authentication.keycloak_admin import KeycloakAdminService
+                    from keycloak.admin_client import KeycloakAdminService
                     kc = KeycloakAdminService()
                     kc.delete_user(keycloak_id)
                     logger.warning(
@@ -307,7 +307,7 @@ def user_edit_view(request, user_id):
             # Sync changes to Keycloak if user is linked
             if target_user.keycloak_id:
                 try:
-                    from authentication.keycloak_admin import KeycloakAdminService
+                    from keycloak.admin_client import KeycloakAdminService
                     kc = KeycloakAdminService()
                     kc.update_user(
                         keycloak_id=target_user.keycloak_id,
@@ -401,7 +401,7 @@ def user_toggle_active_view(request, user_id):
     # Sync active status to Keycloak
     if target_user.keycloak_id:
         try:
-            from authentication.keycloak_admin import KeycloakAdminService
+            from keycloak.admin_client import KeycloakAdminService
             kc = KeycloakAdminService()
             kc.update_user(
                 keycloak_id=target_user.keycloak_id,
@@ -501,7 +501,7 @@ def user_reset_password_view(request, user_id):
             # Sync new password to Keycloak
             if target_user.keycloak_id:
                 try:
-                    from authentication.keycloak_admin import KeycloakAdminService
+                    from keycloak.admin_client import KeycloakAdminService
                     kc = KeycloakAdminService()
                     kc.reset_password(
                         keycloak_id=target_user.keycloak_id,
@@ -589,7 +589,7 @@ def _sync_user_from_keycloak(request, user):
     if not user.keycloak_id:
         return {'changed': False, 'error': 'No Keycloak ID linked to this user.'}
 
-    from authentication.keycloak_admin import KeycloakAdminService
+    from keycloak.admin_client import KeycloakAdminService
     try:
         kc = KeycloakAdminService()
         kc_user = kc.get_user(user.keycloak_id)

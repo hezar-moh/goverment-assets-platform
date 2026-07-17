@@ -37,6 +37,9 @@ SHARED_APPS = [
     'django_tenants',
     'tenants',
     'authentication',
+    'keycloak',
+    'api',
+    'dashboard',
     'django.contrib.contenttypes',
     'django.contrib.auth',
     'django.contrib.admin',
@@ -227,7 +230,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': None,
     'PAGE_SIZE': 20,
     'EXCEPTION_HANDLER': (
-        'authentication.api_exception_handler.custom_exception_handler'
+        'api.exception_handler.custom_exception_handler'
     ),
 }
 # Silences rest_framework.W001 — we use manual pagination
@@ -270,7 +273,7 @@ SIMPLE_JWT = {
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
     'TOKEN_OBTAIN_SERIALIZER': (
-        'authentication.api_serializers.CustomTokenObtainPairSerializer'
+        'api.serializers.CustomTokenObtainPairSerializer'
     ),
 }
 # CORS — allow all origins in dev, lock down in production
@@ -376,6 +379,11 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        'keycloak': {
+            'handlers': ['security_file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
 # Keycloak / OIDC settings
@@ -412,7 +420,7 @@ OIDC_AUTH_REQUEST_EXTRA_PARAMS = {'prompt': 'login'}
 
 # Authentication backends — OIDC first, fallback to ModelBackend
 AUTHENTICATION_BACKENDS = [
-    'authentication.oidc_backend.GovAssetOIDCBackend',
+    'keycloak.oidc_backend.GovAssetOIDCBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 

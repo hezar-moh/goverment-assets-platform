@@ -21,7 +21,7 @@ class Command(BaseCommand):
     help = 'Sync role + ministry_schema attributes to all 6 demo Keycloak users'
 
     def handle(self, *args, **options):
-        from authentication.keycloak_admin import KeycloakAdminService
+        from keycloak.admin_client import KeycloakAdminService
 
         kc = KeycloakAdminService()
 

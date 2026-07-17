@@ -277,7 +277,7 @@ class Command(BaseCommand):
             # Create in Keycloak first (if enabled)
             if self.sync_keycloak:
                 try:
-                    from authentication.keycloak_admin import KeycloakAdminService
+                    from keycloak.admin_client import KeycloakAdminService
                     kc = KeycloakAdminService()
                     kc.ensure_custom_attributes_defined()
                     # Delete existing Keycloak user first to avoid 409 conflict

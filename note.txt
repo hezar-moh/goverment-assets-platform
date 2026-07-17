@@ -1,70 +1,212 @@
-///////commands////////
+╔══════════════════════════════════════════════════════════════════╗
+║          GOVERNMENT ASSET PLATFORM — QUICK REFERENCE            ║
+║       Full guide: GOVASSET_COMPLETE_GUIDE.md                    ║
+╚══════════════════════════════════════════════════════════════════╝
 
-Start Keycloak: cd C:\keycloak\keycloak-26.6.2\bin then kc.bat start-dev --http-port=8180
+┌────────────────────────────────────────────────────────────────┐
+│                      1. STARTUP COMMANDS                       │
+├────────────────────────────────────────────────────────────────┤
 
-localhost:8180  this is keycloak admin page
+Order matters. Start everything before testing.
 
-http://0.0.0.0:8000/ 
-python manage.py runserver 0.0.0.0:8000
-python manage.py setup_demo_data
-
-we dont use ngrok instead we now use railway for hosting all
-
-so in rawilwaye we never use python manage.py runserver we use gunicorn
-
-db url in railway => postgresql://postgres:cogYGmtAfZIcLjPjZQVCCBtgGKAlUoaZ@tokaido.proxy.rlwy.net:30290/railway
-
-The Swagger page is blank because DEBUG=False stops Django from serving static files. Need to add whitenoise to fix this.
-
-keycloak url publick in railway is keycloak-production-4f96.up.railway.app
+  1. PostgreSQL → Windows service (automatic — always running)
+  2. Django     → python manage.py runserver 0.0.0.0:8000
+  3. Keycloak   → cd C:\keycloak\keycloak-26.6.2\bin
+                  then: kc.bat start-dev --http-port=8180
+  4. Flutter    → cd C:\Users\Hemed\govasset_mobile
+                  then: flutter run (separate terminal)
 
 
-below is client secret which we will use for Django in our railway
-duXEGfbMfBppvG2LD3bV8Fc4wCfSVY7l
+┌────────────────────────────────────────────────────────────────┐
+│                      2. KEY URLs                               │
+├────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────┬──────────────────────────────────────────┐
+  │ WHAT                │ URL                                      │
+  ├─────────────────────┼──────────────────────────────────────────┤
+  │ Django (local)      │ http://localhost:8000                    │
+  │ Django (production) │ https://goverment-assets-platform-       │
+  │                     │   production.up.railway.app              │
+  │ Keycloak (local)    │ http://localhost:8180/admin              │
+  │ Keycloak (prod)     │ https://keycloak-production-4f96.        │
+  │                     │   up.railway.app/admin                   │
+  │ Swagger API docs    │ http://localhost:8000/swagger/           │
+  │ Mobile config file  │ C:\Users\Hemed\govasset_mobile\          │
+  │                     │   lib\config\api_config.dart             │
+  └─────────────────────┴──────────────────────────────────────────┘
+
+  Keycloak admin: superadmin / Admin@123
+  All demo users: password Admin@123
 
 
-in mobile => go to  lib/config/api_config.dart , then  change the API base URL from:
-http://192.168.100.18:8000
-to:
-https://goverment-assets-platform-production.up.railway.app
+┌────────────────────────────────────────────────────────────────┐
+│                      3. MANAGEMENT COMMANDS                    │
+├────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────────────┬──────────────────────────┐
+  │ COMMAND                              │ WHAT IT DOES             │
+  ├──────────────────────────────────────┼──────────────────────────┤
+  │ python manage.py runserver           │ Start Django locally     │
+  │   0.0.0.0:8000                       │ (phone can reach it)     │
+  │ python manage.py setup_demo_data     │ Create/reset demo users  │
+  │   --sync-keycloak                    │ + assets + Keycloak sync │
+  │ python manage.py sync_keycloak_      │ Fix missing role/        │
+  │   attributes                         │ ministry_schema on users │
+  │ python manage.py migrate             │ Apply DB migrations      │
+  │ python manage.py collectstatic       │ Gather static files      │
+  │   --noinput                          │                          │
+  │ python -m pytest                     │ Run all 83 unit tests    │
+  │ python manage.py shell               │ Django interactive shell │
+  └──────────────────────────────────────┴──────────────────────────┘
 
 
-to check keycloak versions
-Keycloak versions:
-- Local: Open PowerShell in C:\keycloak-25.0.1\bin and run .\kc.bat --version
-- Railway: You already saw it — 26.1.5 in Server Info
+┌────────────────────────────────────────────────────────────────┐
+│                      4. RAILWAY DEPLOYMENT                     │
+├────────────────────────────────────────────────────────────────┘
+
+  URL:  https://railway.app/project/[project-id]
+  Login: Railway account credentials
+
+  ┌──────────────┬──────────────────────────────────────────┐
+  │ ACTION       │ HOW                                      │
+  ├──────────────┼──────────────────────────────────────────┤
+  │ Deploy       │ git add . → git commit -m "msg" →        │
+  │              │ git push (auto-deploys in ~2 min)        │
+  │ View logs    │ Railway Dashboard → Django service →     │
+  │              │ Deployments → click deploy → View logs   │
+  │ Set env vars │ Railway Dashboard → Django service →     │
+  │              │ Variables tab → Add new variable         │
+  │ DB access    │ pgAdmin → tokaido.proxy.rlwy.net:30290  │
+  └──────────────┴──────────────────────────────────────────┘
+
+  Railway env vars you MUST set on Django service:
+    KEYCLOAK_SERVER_URL   = https://keycloak-production-4f96.up.railway.app
+    KEYCLOAK_ADMIN_USERNAME = superadmin
+    KEYCLOAK_ADMIN_PASSWORD = Admin@123
+    PLATFORM_BASE_URL     = https://goverment-assets-platform-production.up.railway.app
+    ALLOWED_HOSTS         = goverment-assets-platform-production.up.railway.app,localhost
 
 
-# Demo User Management
+┌────────────────────────────────────────────────────────────────┐
+│                      5. DATABASE ACCESS (pgAdmin)              │
+├────────────────────────────────────────────────────────────────┘
 
-Use the appropriate command based on your situation.
+  Connect to Railway PostgreSQL:
 
-| Command | When to Use | What It Does |
-|---------|-------------|--------------|
-| `python manage.py setup_demo_data` | **First-time setup** or whenever you want to **reset the demo environment**. | Recreates Django demo users, demo assets, audit logs, **and** Keycloak users. |
-| `python manage.py sync_keycloak_attribu` | When **Keycloak users already exist** but are missing the `role` and `ministry_schema` attributes (for example, after the Railway deployment issue). | Updates existing Keycloak users by adding the missing `role` and `ministry_schema` attributes without recreating the users. |
+    Host: tokaido.proxy.rlwy.net
+    Port: 30290 (NOT 5432 — 5432 is internal only)
+    Username: Reveal PGUSER in Railway Variables tab
+    Password: Reveal PGPASSWORD in Railway Variables tab
+    Database: railway (or whatever PGDATABASE says)
+    Save password? Yes
+
+  ⚠️ After editing a cell in pgAdmin View/Edit Data grid,
+     you MUST click the ⚡ lightning bolt or press F6
+     to save. Just clicking away does NOT save.
+
+  Useful SQL:
+    -- List all schemas (ministries)
+    SELECT schema_name FROM information_schema.schemata
+    WHERE schema_name NOT IN ('information_schema','pg_catalog','pg_toast');
+
+    -- Drop a schema (e.g., reset a ministry)
+    DROP SCHEMA moh_schema CASCADE;
 
 
+┌────────────────────────────────────────────────────────────────┐
+│                      6. QUICK CODE LOCATIONS                   │
+├────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────┬────────────────────────────────┐
+  │ WHAT YOU NEED                │ FILE                           │
+  ├──────────────────────────────┼────────────────────────────────┤
+  │ Django settings              │ config/settings.py             │
+  │ Main URL routing             │ config/urls.py                 │
+  │ API URL routing              │ authentication/api_urls.py     │
+  │ User model + roles           │ authentication/models.py       │
+  │ Keycloak sync/oidc           │ authentication/oidc_backend.py │
+  │ Keycloak admin API calls     │ authentication/keycloak_admin.py│
+  │ User management views        │ authentication/user_views.py   │
+  │ Dashboard views              │ authentication/dashboard_views.py│
+  │ Asset model                  │ assets/models.py               │
+  │ Asset web views              │ assets/views.py                │
+  │ Asset API views              │ assets/api_views.py            │
+  │ AuditLog + OrgUnit models    │ organizations/models.py        │
+  │ Master data / cat. views     │ organizations/master_data_views.py│
+  │ Ministry model               │ tenants/models.py              │
+  │ All HTML templates           │ templates/                     │
+  │ All CSS (incl. responsive)   │ static/css/style.css           │
+  │ Permissions decorators       │ authentication/decorators.py   │
+  └──────────────────────────────┴────────────────────────────────┘
 
 
+┌────────────────────────────────────────────────────────────────┐
+│                      7. DEMO USERS                             │
+├────────────────────────────────────────────────────────────────┘
+
+  All passwords: Admin@123
+
+  ┌──────────────┬────────────────┬─────────────────┐
+  │ USERNAME     │ ROLE            │ MINISTRY        │
+  ├──────────────┼────────────────┼─────────────────┤
+  │ superadmin   │ SUPER_ADMIN    │ All             │
+  │ moh_admin    │ MINISTRY_ADMIN │ Ministry of Health│
+  │ mnh_manager  │ AGENCY_MANAGER │ Ministry of Health│
+  │ rad_clerk    │ FACILITY_CLERK │ Ministry of Health│
+  │ moh_auditor  │ AUDITOR        │ Ministry of Health│
+  │ mof_admin    │ MINISTRY_ADMIN │ Ministry of Finance│
+  └──────────────┴────────────────┴─────────────────┘
 
 
+┌────────────────────────────────────────────────────────────────┐
+│                      8. COMMON PROBLEMS & FIXES                │
+├────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────┬──────────────────────────────────┐
+  │ PROBLEM                     │ FIX                              │
+  ├─────────────────────────────┼──────────────────────────────────┤
+  │ Phone can't reach Django    │ Use 0.0.0.0:8000, not just       │
+  │                             │ runserver                        │
+  │ "Invalid HTTP_HOST"         │ Add IP to ALLOWED_HOSTS          │
+  │ Keycloak 502 on Railway     │ Set JAVA_OPTS_APPEND=-Xmx256m    │
+  │                             │   -Xms128m (too much memory)     │
+  │ User in Keycloak but not    │ Approve PendingAccess in Django  │
+  │   in Django                 │ admin, or create user manually   │
+  │ Admin API returns 401       │ Check KEYCLOAK_ADMIN_USERNAME/   │
+  │                             │ PASSWORD env vars are set        │
+  │ 403 on Manage Account page  │ Add URL to Web Origins in        │
+  │                             │ account-console client           │
+  │ Flutter wrong IP            │ Run ipconfig, update             │
+  │                             │ api_config.dart                  │
+  └─────────────────────────────┴──────────────────────────────────┘
 
 
+┌────────────────────────────────────────────────────────────────┐
+│                      9. TEST ACCOUNTS (External API)           │
+├────────────────────────────────────────────────────────────────┘
+
+  For groups integrating via API:
+
+    Login:    POST /api/auth/login/
+              {"username": "moh_admin", "password": "Admin@123"}
+
+    Verify:   GET /api/auth/verify-token/
+              Authorization: Bearer {access_token}
+
+    Refresh:  POST /api/auth/refresh/
+              {"refresh": "{refresh_token}"}
+
+  Client secret for external apps: duXEGfbMfBppvG2LD3bV8Fc4wCfSVY7l
 
 
+┌────────────────────────────────────────────────────────────────┐
+│                      10. ARCHITECTURE (30-SECOND VIEW)         │
+├────────────────────────────────────────────────────────────────┘
 
+  Django (server logic) ───→ PostgreSQL (data, multi-schema)
+       │
+       └──→ Keycloak (SSO, passwords)
+       │
+       └──→ Flutter (mobile via API)
 
-How to Delete Schemas (the "can't drop" error)
-You get cannot drop schema because other objects depend on it because there are tables inside. Do this:
--- Run these in pgAdmin query tool or psql:
-
--- Step 1: Drop all tables in the schema first
-DROP SCHEMA moh_schema CASCADE;
-
--- CASCADE means "delete everything inside, including tables"
-Or from Django shell:
-python manage.py shell
-from tenants.models import Ministry
-m = Ministry.objects.get(schema_name='moh_schema')
-m.delete(force_drop=True)  # drops the schema and all its data
+  For complete details: see GOVASSET_COMPLETE_GUIDE.md
