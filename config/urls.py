@@ -35,8 +35,6 @@ urlpatterns = [
     path('', include('assets.urls')),
     path('', include('organizations.urls')),
     path('', include('tenants.urls')),
-    path('api/', include('api.urls')),
-    path('oidc/', include('mozilla_django_oidc.urls')),
     path(
         'api/docs/',
         schema_view.with_ui('swagger', cache_timeout=0),
@@ -47,6 +45,8 @@ urlpatterns = [
         schema_view.with_ui('redoc', cache_timeout=0),
         name='schema-redoc'
     ),
+    path('api/', include('api.urls')),
+    path('oidc/', include('mozilla_django_oidc.urls')),
 ]
 
 if settings.DEBUG:
