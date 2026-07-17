@@ -60,3 +60,6 @@ coverage.xml
 
 # Logs
 logs/*.log
+
+# opencode AI tool config (like .vscode/)
+.opencode/
