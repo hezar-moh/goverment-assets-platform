@@ -1,14 +1,16 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django_tenants.utils import schema_context
 from django.utils import timezone
+from authentication.decorators import login_required_custom
 
 
+@login_required_custom
 def dashboard_view(request):
     user = request.user
     context = {
         "user": user,
-        "role": user.role,
-        "ministry_schema": user.ministry_schema,
+        "role": getattr(user, "role", None),
+        "ministry_schema": getattr(user, "ministry_schema", None),
     }
 
     if user.role == "SUPER_ADMIN":
