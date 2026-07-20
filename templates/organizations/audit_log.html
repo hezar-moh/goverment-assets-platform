@@ -14,21 +14,138 @@
 </div>
 
 {% if is_super_admin %}
+
+{% if not selected_schema %}
 <div class="card" style="padding: 40px; text-align: center">
   <i
-    class="bi bi-info-circle"
+    class="bi bi-building"
     style="
       font-size: 2rem;
-      color: var(--info);
+      color: var(--primary);
       display: block;
       margin-bottom: 10px;
     "
   ></i>
-  <p style="color: var(--text-secondary)">
-    Audit logs are stored per ministry schema. Log in as a ministry user to view
-    their audit trail.
+  <p style="color: var(--text-secondary); margin-bottom: 20px">
+    Select a ministry to view its audit trail.
   </p>
+
+  <form method="get" style="display: inline-block">
+    <select name="schema" class="form-select" style="width: 300px">
+      <option value="">— Choose Ministry —</option>
+      {% for s in available_schemas %}
+      <option value="{{ s }}">{{ s }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary btn-sm" style="margin-left: 8px">
+      View Logs
+    </button>
+  </form>
 </div>
+{% endif %}
+
+{% if selected_schema %}
+<div class="filter-bar">
+  <form method="get" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; width: 100%;">
+    <input type="hidden" name="schema" value="{{ selected_schema }}">
+
+    <div class="filter-group">
+      <label>Ministry Schema</label>
+      <select name="schema" class="form-select" onchange="this.form.submit()">
+        {% for s in available_schemas %}
+        <option value="{{ s }}" {% if s == selected_schema %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Filter by Action</label>
+      <select name="action" class="form-select">
+        <option value="">All Actions</option>
+        <option value="CREATE" {% if action_filter == "CREATE" %}selected{% endif %}>Create</option>
+        <option value="UPDATE" {% if action_filter == "UPDATE" %}selected{% endif %}>Update</option>
+        <option value="DELETE" {% if action_filter == "DELETE" %}selected{% endif %}>Delete</option>
+        <option value="LOGIN" {% if action_filter == "LOGIN" %}selected{% endif %}>Login</option>
+        <option value="LOGOUT" {% if action_filter == "LOGOUT" %}selected{% endif %}>Logout</option>
+        <option value="ACCESS_DENIED" {% if action_filter == "ACCESS_DENIED" %}selected{% endif %}>Access Denied</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Date From</label>
+      <input type="date" name="date_from" value="{{ date_from }}" class="form-control" />
+    </div>
+
+    <div class="filter-group">
+      <label>Date To</label>
+      <input type="date" name="date_to" value="{{ date_to }}" class="form-control" />
+    </div>
+
+    <div style="display: flex; gap: 8px">
+      <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel-fill"></i> Filter</button>
+      <a href="{% url 'audit_log' %}" class="btn btn-outline btn-sm"><i class="bi bi-x"></i> Clear</a>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div style="overflow-x: auto">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Action</th>
+          <th>Performed By</th>
+          <th>Module</th>
+          <th>Description</th>
+          <th>IP Address</th>
+          <th>Timestamp</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr onclick="window.location='{% url 'audit_log_detail' log.id %}'" style="cursor: pointer" class="audit-row">
+          <td>
+            <span class="badge {% if log.action == 'CREATE' %}badge-create{% elif log.action == 'UPDATE' %}badge-update{% elif log.action == 'DELETE' %}badge-delete{% elif log.action == 'LOGIN' %}badge-login{% elif log.action == 'LOGOUT' %}badge-logout{% else %}badge-denied{% endif %}">
+              <i class="bi {% if log.action == 'CREATE' %}bi-plus-circle{% elif log.action == 'UPDATE' %}bi-pencil{% elif log.action == 'DELETE' %}bi-trash{% elif log.action == 'LOGIN' %}bi-box-arrow-in-right{% elif log.action == 'LOGOUT' %}bi-box-arrow-right{% else %}bi-shield-exclamation{% endif %}"></i>
+              {{ log.action }}
+            </span>
+          </td>
+          <td>
+            <div class="user-cell">
+              <div class="avatar avatar-blue" style="width: 28px; height: 28px; font-size: 10px">
+                {{ log.performed_by_name|slice:":2"|upper }}
+              </div>
+              <span style="font-weight: 600; font-size: 13px">{{ log.performed_by_name|default:"System" }}</span>
+            </div>
+          </td>
+          <td><code style="font-size: 11.5px">{{ log.model_name }}</code></td>
+          <td style="color: var(--text-secondary); max-width: 280px">
+            <span title="{{ log.object_repr }}">{{ log.object_repr|truncatechars:50 }}</span>
+          </td>
+          <td style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted)">{{ log.ip_address|default:"—" }}</td>
+          <td style="font-size: 12.5px; color: var(--text-muted); white-space: nowrap">{{ log.timestamp|date:"d M Y H:i:s" }}</td>
+          <td>
+            <a href="{% url 'audit_log_detail' log.id %}{% if is_super_admin %}?schema={{ selected_schema }}{% endif %}" class="btn btn-outline btn-sm" onclick="event.stopPropagation()">View</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7">
+            <div class="empty-state">
+              <i class="bi bi-journal-x"></i>
+              <p>No audit records found.</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if page %} {% include 'shared/pagination.html' %} {% endif %}
+</div>
+{% endif %}
+
 {% else %}
 
 <div class="filter-bar">

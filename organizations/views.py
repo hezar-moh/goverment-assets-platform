@@ -373,52 +373,99 @@ def org_unit_delete_view(request, unit_id):
 def audit_log_view(request):
     user = request.user
 
-    # ── SUPER ADMIN: show their own public-schema logs ──────────
+    # ── SUPER ADMIN: select a ministry schema to view its audit logs ──
     if user.role == 'SUPER_ADMIN':
-        from authentication.models import SuperAdminAuditLog
+        from authentication.models import CustomUser
+        available_schemas = list(
+            CustomUser.objects.exclude(
+                ministry_schema__isnull=True
+            ).exclude(
+                ministry_schema__exact=''
+            ).values_list('ministry_schema', flat=True).distinct().order_by('ministry_schema')
+        )
 
-        action_filter = request.GET.get('action', '').strip()
-        date_from     = request.GET.get('date_from', '').strip()
-        date_to       = request.GET.get('date_to', '').strip()
+        selected_schema = request.GET.get('schema', '').strip()
 
-        qs = SuperAdminAuditLog.objects.all()
+        if selected_schema and selected_schema in available_schemas:
+            action_filter = request.GET.get('action', '').strip()
+            date_from     = request.GET.get('date_from', '').strip()
+            date_to       = request.GET.get('date_to', '').strip()
 
-        if action_filter:
-            qs = qs.filter(action=action_filter)
-        if date_from:
-            from django.utils.dateparse import parse_date
-            parsed = parse_date(date_from)
-            if parsed:
-                qs = qs.filter(timestamp__date__gte=parsed)
-        if date_to:
-            from django.utils.dateparse import parse_date
-            parsed = parse_date(date_to)
-            if parsed:
-                qs = qs.filter(timestamp__date__lte=parsed)
+            logs            = []
+            available_users = []
+            available_modules = []
+            page            = None
+            paginator       = None
 
-        from authentication.pagination import paginate_queryset
-        page, paginator = paginate_queryset(qs, request, per_page=25)
+            try:
+                from django_tenants.utils import schema_context
+                with schema_context(selected_schema):
+                    from organizations.models import AuditLog
+                    qs = AuditLog.objects.all()
 
-        return render(request, 'organizations/audit_log.html', {
-            'logs':             list(page.object_list),
-            'is_super_admin':   True,
-            'page_title':       'Audit Logs — Platform Level',
-            'action_filter':    action_filter,
-            'date_from':        date_from,
-            'date_to':          date_to,
-            'available_users':  list(
-                SuperAdminAuditLog.objects.values_list(
-                    'performed_by_name', flat=True
-                ).distinct()
-            ),
-            'available_modules': list(
-                SuperAdminAuditLog.objects.values_list(
-                    'action', flat=True
-                ).distinct()
-            ),
-            'page':      page,
-            'paginator': paginator,
-        })
+                    if action_filter:
+                        qs = qs.filter(action=action_filter)
+                    if date_from:
+                        from django.utils.dateparse import parse_date
+                        parsed = parse_date(date_from)
+                        if parsed:
+                            qs = qs.filter(timestamp__date__gte=parsed)
+                    if date_to:
+                        from django.utils.dateparse import parse_date
+                        parsed = parse_date(date_to)
+                        if parsed:
+                            qs = qs.filter(timestamp__date__lte=parsed)
+
+                    available_users = list(
+                        AuditLog.objects.values_list(
+                            'performed_by_name', flat=True
+                        ).distinct().order_by('performed_by_name')
+                    )
+                    available_users = [u for u in available_users if u]
+
+                    available_modules = list(
+                        AuditLog.objects.values_list(
+                            'model_name', flat=True
+                        ).distinct().order_by('model_name')
+                    )
+                    available_modules = [m for m in available_modules if m]
+
+                    from authentication.pagination import paginate_queryset
+                    page, paginator = paginate_queryset(qs, request, per_page=25)
+                    logs = list(page.object_list)
+
+            except Exception as e:
+                messages.error(request, f"Error loading audit logs: {str(e)}")
+
+            return render(request, 'organizations/audit_log.html', {
+                'logs':               logs,
+                'is_super_admin':     True,
+                'page_title':         f'Audit Logs — {selected_schema}',
+                'action_filter':      action_filter,
+                'date_from':          date_from,
+                'date_to':            date_to,
+                'available_users':    available_users,
+                'available_modules':  available_modules,
+                'page':               page,
+                'paginator':          paginator,
+                'available_schemas':  available_schemas,
+                'selected_schema':    selected_schema,
+            })
+        else:
+            return render(request, 'organizations/audit_log.html', {
+                'logs':               [],
+                'is_super_admin':     True,
+                'page_title':         'Audit Logs — Select a Ministry',
+                'action_filter':      '',
+                'date_from':          '',
+                'date_to':            '',
+                'available_users':    [],
+                'available_modules':  [],
+                'page':               None,
+                'paginator':          None,
+                'available_schemas':  available_schemas,
+                'selected_schema':    '',
+            })
     # ── END SUPER ADMIN SECTION ──────────────────────────────────
 
     # Ministry Admin and Auditor — existing code below unchanged
@@ -491,6 +538,8 @@ def audit_log_view(request):
         'available_modules':  available_modules,
         'page':               page,
         'paginator':          paginator,
+        'available_schemas':  [],
+        'selected_schema':    '',
     })
     
 @login_required_custom
@@ -507,22 +556,32 @@ def audit_log_detail_view(request, log_id):
     log = None
 
     if user.role == 'SUPER_ADMIN':
-        messages.info(
-            request,
-            "Log in as a ministry user to view audit log details."
-        )
-        return redirect('audit_log')
+        schema_param = request.GET.get('schema', '').strip()
+        if not schema_param:
+            messages.error(request, "Select a ministry schema to view audit log details.")
+            return redirect('audit_log')
 
-    try:
-        with schema_context(user.ministry_schema):
-            from organizations.models import AuditLog
-            log = AuditLog.objects.get(id=log_id)
-    except AuditLog.DoesNotExist:
-        messages.error(request, "Audit log entry not found.")
-        return redirect('audit_log')
-    except Exception as e:
-        messages.error(request, f"Error loading audit log: {str(e)}")
-        return redirect('audit_log')
+        try:
+            with schema_context(schema_param):
+                from organizations.models import AuditLog
+                log = AuditLog.objects.get(id=log_id)
+        except AuditLog.DoesNotExist:
+            messages.error(request, "Audit log entry not found.")
+            return redirect('audit_log')
+        except Exception as e:
+            messages.error(request, f"Error loading audit log: {str(e)}")
+            return redirect('audit_log')
+    else:
+        try:
+            with schema_context(user.ministry_schema):
+                from organizations.models import AuditLog
+                log = AuditLog.objects.get(id=log_id)
+        except AuditLog.DoesNotExist:
+            messages.error(request, "Audit log entry not found.")
+            return redirect('audit_log')
+        except Exception as e:
+            messages.error(request, f"Error loading audit log: {str(e)}")
+            return redirect('audit_log')
 
     # Build a clean side-by-side comparison of old vs new values
     # Each item in changes is: { field, old_val, new_val, changed }
